@@ -322,8 +322,10 @@ func (api *APIServer) handleSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		api.SM.mu.Unlock()
 
+		// Получаем копию актуальных настроек
+		settings := api.SM.GetGlobalSettings()
 		// Сохраняем в config.yaml
-		go api.saveSettingsToConfig()
+		go api.saveSettingsToConfig(settings)
 
 		w.WriteHeader(http.StatusOK)
 
@@ -347,7 +349,7 @@ func (api *APIServer) handleReloadSettings(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusOK)
 }
 
-func (api *APIServer) saveSettingsToConfig() {
+func (api *APIServer) saveSettingsToConfig(settings *Config) {
 	// Читаем текущий config.yaml
 	data, err := os.ReadFile("config.yaml")
 	if err != nil {
@@ -360,11 +362,6 @@ func (api *APIServer) saveSettingsToConfig() {
 		log.Printf("[API] Failed to parse config.yaml: %v", err)
 		return
 	}
-
-	// Обновляем настройки
-	api.SM.mu.RLock()
-	settings := api.SM.GetGlobalSettings()
-	api.SM.mu.RUnlock()
 
 	// Обновляем только безопасные настройки (не трогаем ListenPort, APIAuthUser, APIAuthPassword)
 	cfg.SRTSettings = settings.SRTSettings

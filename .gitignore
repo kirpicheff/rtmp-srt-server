@@ -1,3 +1,4 @@
 *.exe
 *.log
 config.yaml 
+*.zip
