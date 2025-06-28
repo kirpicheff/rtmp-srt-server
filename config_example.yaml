@@ -1,0 +1,28 @@
+server:
+  port: 8080
+  rtmp_port: 1935
+  api_username: admin
+  api_password: secret
+
+srt_settings:
+  latency: 120
+  connect_timeout: 5000
+  passphrase: "mysecretpassphrase"
+  streamid: "live/stream"
+  encryption: "yes"
+
+log_to_file: true
+log_file: "server.log"
+reconnect_interval: 5
+
+inputs:
+  - name: "obs"
+    url_path: "/live/stream"
+    outputs:
+      - "srt://192.168.1.100:9000?streamid=live/stream"
+      - "rtmp://192.168.1.101/live/stream"
+  
+  - name: "mobile"
+    url_path: "/live/mobile"
+    outputs:
+      - "srt://192.168.1.102:9000?streamid=mobile/stream" 
