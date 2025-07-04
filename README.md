@@ -267,6 +267,91 @@ go project/
 
 The server automatically detects video/audio PIDs by content, even if the incoming SRT/TS stream is missing PMT/PAT tables or uses non-standard PIDs. This ensures maximum compatibility with streams from OBS, ffmpeg, hardware encoders, and other sources.
 
+## WHIP (WebRTC-HTTP Ingest Protocol) support
+
+Проект поддерживает приём WebRTC-потоков по протоколу WHIP (endpoint: `/whip/{name}`).
+
+### Как это работает
+
+- При подключении клиента по WHIP сервер создаёт отдельный процесс ffmpeg.
+- ffmpeg получает медиа-поток по WebRTC (SDP) и преобразует его в стандартный поток (FLV), который далее обрабатывается системой.
+- После этого поток автоматически направляется на все выходы, указанные в конфиге для данного input (RTMP, SRT, запись в файл и т.д.).
+- Для каждого входа создаётся отдельный ffmpeg-процесс, что обеспечивает изоляцию и стабильность обработки.
+
+**Схема работы:**
+
+```mermaid
+flowchart LR
+    subgraph Вход
+        A[WHIP клиент (WebRTC)]
+    end
+    subgraph Сервер
+        B[WHIP endpoint /whip/{name}]
+        C[ffmpeg (SDP -> FLV)]
+        D[StreamManager]
+    end
+    subgraph Выходы
+        E[RTMP]
+        F[SRT]
+        G[File (FLV)]
+    end
+    A -- SDP/медиа --> B
+    B -- SDP --> C
+    C -- FLV packets --> D
+    D -- потоки --> E
+    D -- потоки --> F
+    D -- потоки --> G
+```
+
+### Требования к ffmpeg
+Для работы WHIP необходим ffmpeg, собранный с поддержкой следующих опций:
+
+```
+--prefix=/mingw64
+--disable-everything
+--enable-protocol='pipe,rtmp,file'
+--enable-demuxer=rtp
+--enable-decoder=opus
+--enable-muxer=flv
+--enable-encoder=libfdk_aac
+--enable-network
+--enable-gpl
+--enable-nonfree
+--enable-libfdk-aac
+--enable-small
+--disable-doc
+--disable-ffplay
+--disable-ffprobe
+--disable-postproc
+--disable-avdevice
+--disable-swscale
+--disable-debug
+--enable-swresample
+--disable-shared
+--enable-static
+--extra-cflags=-static
+--extra-ldflags=-static
+--pkg-config-flags=--static
+--enable-filter='aformat,anull,atrim,aresample'
+--enable-parser=h264
+--enable-demuxer=h264
+--enable-bsfs
+--enable-bsf=h264_mp4toannexb
+--enable-bsf=extract_extradata
+```
+
+### Пример запроса
+
+```
+POST /whip/obs_whip HTTP/1.1
+Content-Type: application/sdp
+
+v=0
+...
+```
+
+Поток будет автоматически обработан и направлен на все выходы, указанные в конфиге для данного input.
+
 # Русская версия ниже
 
 Сервер для ретрансляции RTMP-потоков с поддержкой SRT-выходов и веб-интерфейсом управления.
@@ -653,7 +738,7 @@ go project/
     -H 'Content-Type: application/json' \
     -d '{"name":"obs","url":"rtmp://example.com/live/stream"}'
   ```
-- `POST /api/outputs/reconnect` — принудительный реконнект выхода
+- `POST /api/outputs/reconnect` — force reconnect output
   ```bash
   curl -u admin:secret -X POST http://localhost:8080/api/outputs/reconnect \
     -H 'Content-Type: application/json' \
@@ -674,4 +759,14 @@ go project/
 - `POST /api/settings/reload` — перезагрузить из файла
   ```bash
   curl -u admin:secret -X POST http://localhost:8080/api/settings/reload
-  ``` 
+  ```
+
+> **Важно:**
+> Для работы WHIP (и других функций, использующих ffmpeg) требуется, чтобы файл `ffmpeg.exe` находился в папке `bin` внутри директории с программой:
+>
+> ```
+> go project/
+> ├── bin/
+> │   └── ffmpeg.exe
+> └── ...
+> ``` 

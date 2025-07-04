@@ -35,10 +35,11 @@ type WHIPServer struct {
 }
 
 type WHIPSession struct {
-	inputName string
-	ffmpegCmd *exec.Cmd
-	outputMgr *OutputManager
-	stopCh    chan struct{}
+	inputName           string
+	combinedSdpFilename string
+	ffmpegCmd           *exec.Cmd
+	outputMgr           *OutputManager
+	stopCh              chan struct{}
 
 	// Pipe для отправки RTP пакетов в ffmpeg
 	audioWriter io.WriteCloser
@@ -234,7 +235,7 @@ func (w *WHIPServer) startFFmpegPipeline(session *WHIPSession, inputCfg *InputCf
 	videoUDPPort := rand.Intn(10000) + 40000 // 40000-49999
 	audioUDPPort := rand.Intn(10000) + 50000 // 50000-59999
 
-	combinedSdpFilename := fmt.Sprintf("whip_combined_%s.sdp", session.inputName)
+	session.combinedSdpFilename = fmt.Sprintf("whip_combined_%s.sdp", session.inputName)
 
 	// Создаём единый SDP файл для видео и аудио, чтобы ffmpeg понимал, что они связаны
 	combinedSdpContent := []byte(fmt.Sprintf(
@@ -250,7 +251,7 @@ func (w *WHIPServer) startFFmpegPipeline(session *WHIPSession, inputCfg *InputCf
 		videoUDPPort,
 		audioUDPPort,
 	))
-	if err := ioutil.WriteFile(combinedSdpFilename, combinedSdpContent, 0644); err != nil {
+	if err := ioutil.WriteFile(session.combinedSdpFilename, combinedSdpContent, 0644); err != nil {
 		log.Printf("[WHIP] Failed to write Combined SDP file: %v", err)
 		return
 	}
@@ -260,7 +261,7 @@ func (w *WHIPServer) startFFmpegPipeline(session *WHIPSession, inputCfg *InputCf
 		"-thread_queue_size", "1024",
 		"-rtbufsize", "2M",
 		"-protocol_whitelist", "file,udp,rtp",
-		"-i", combinedSdpFilename,
+		"-i", session.combinedSdpFilename,
 		"-map", "0:v",
 		"-map", "0:a",
 		// Копируем видео, конвертируем аудио
@@ -351,6 +352,16 @@ func (w *WHIPServer) startFFmpegPipeline(session *WHIPSession, inputCfg *InputCf
 
 	// Обновляем статус в менеджере
 	w.manager.SetStatusActive(session.inputName, false)
+
+	// Удаляем временный SDP файл
+	if session.combinedSdpFilename != "" {
+		if err := os.Remove(session.combinedSdpFilename); err != nil {
+			// Это не критичная ошибка, просто логируем, т.к. файл мог быть удален вручную или не создаться
+			log.Printf("[WHIP] Failed to remove temporary SDP file %s: %v", session.combinedSdpFilename, err)
+		}
+	}
+
+	log.Printf("[WHIP] Session stopped for '%s'", session.inputName)
 }
 
 func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<-chan av.Packet, <-chan struct{}) {
@@ -714,6 +725,14 @@ func (w *WHIPServer) stopSession(session *WHIPSession) {
 
 	// Обновляем статус в менеджере
 	w.manager.SetStatusActive(session.inputName, false)
+
+	// Удаляем временный SDP файл
+	if session.combinedSdpFilename != "" {
+		if err := os.Remove(session.combinedSdpFilename); err != nil {
+			// Это не критичная ошибка, просто логируем, т.к. файл мог быть удален вручную или не создаться
+			log.Printf("[WHIP] Failed to remove temporary SDP file %s: %v", session.combinedSdpFilename, err)
+		}
+	}
 
 	log.Printf("[WHIP] Session stopped for '%s'", session.inputName)
 }
