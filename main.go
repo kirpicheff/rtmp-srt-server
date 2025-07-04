@@ -42,6 +42,9 @@ func main() {
 	// SRT сервер
 	srtServer := NewSRTServer(cfg.Server.SRTPort, cfg, sm)
 
+	// WHIP сервер
+	whipServer := NewWHIPServer(cfg.Server.WHIPPort, sm)
+
 	// HTTP API сервер
 	apiServer := NewAPIServer(sm, cfg.Server.APIAuthUser, cfg.Server.APIAuthPassword)
 	httpServer := &http.Server{
@@ -69,6 +72,13 @@ func main() {
 		}
 	}()
 
+	// Запуск WHIP сервера
+	go func() {
+		if err := whipServer.Start(); err != nil {
+			log.Fatalf("WHIP server error: %v", err)
+		}
+	}()
+
 	// Запуск HTTP API сервера
 	go func() {
 		log.Printf("[API] server listening on :%d", cfg.Server.Port)
@@ -91,6 +101,11 @@ func main() {
 	// Завершаем SRT сервер
 	if err := srtServer.Stop(); err != nil {
 		log.Printf("SRT server shutdown error: %v", err)
+	}
+
+	// Завершаем WHIP сервер
+	if err := whipServer.Stop(); err != nil {
+		log.Printf("WHIP server shutdown error: %v", err)
 	}
 
 	// Завершаем RTMP сервер (у joy4 нет явного метода shutdown, он просто перестаёт принимать)

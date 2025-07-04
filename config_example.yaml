@@ -3,6 +3,7 @@ server:
   rtmp_port: 1935
   api_username: admin
   api_password: secret
+  whip_port: 8084
 
 srt_settings:
   latency: 120
@@ -25,4 +26,8 @@ inputs:
   - name: "mobile"
     url_path: "/live/mobile"
     outputs:
-      - "srt://192.168.1.102:9000?streamid=mobile/stream" 
+      - "srt://192.168.1.102:9000?streamid=mobile/stream"
+
+  - name: "obs_whip"
+    url_path: "/whip/obs"
+    outputs: [] 

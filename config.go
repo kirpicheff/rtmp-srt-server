@@ -21,6 +21,7 @@ type ServerConfig struct {
 	Port            int    `yaml:"port"`
 	RTMPPort        int    `yaml:"rtmp_port"`
 	SRTPort         int    `yaml:"srt_port"`
+	WHIPPort        int    `yaml:"whip_port"`
 	APIAuthUser     string `yaml:"api_username"`
 	APIAuthPassword string `yaml:"api_password"`
 }
