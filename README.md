@@ -1,10 +1,10 @@
-# RTMP/SRT Server Manager
+# RTMP/SRT/WHIP Server Manager
 
-A server for relaying RTMP streams with SRT output support and a web management interface.
+A server for relaying RTMP streams with SRT output support, WHIP (WebRTC-HTTP Ingest Protocol) support, and a web management interface.
 
 ## Features
 
-- 📥 Accepts RTMP and SRT streams
+- 📥 Accepts RTMP, SRT, and WHIP streams
 - 📤 Relays to RTMP and SRT outputs
 - 💾 Writes streams to FLV files
 - 🌐 Web management interface
@@ -295,25 +295,25 @@ The server automatically detects video/audio PIDs by content, even if the incomi
 
 ```mermaid
 flowchart LR
-    subgraph Вход
-        A[WHIP клиент (WebRTC)]
+    subgraph Input ["Вход"]
+        A["WHIP клиент (WebRTC)"]
     end
-    subgraph Сервер
-        B[WHIP endpoint /whip/{name}]
-        C[ffmpeg (SDP -> FLV)]
-        D[StreamManager]
+    subgraph Server ["Сервер"]
+        B["WHIP endpoint /whip/{name}"]
+        C["ffmpeg (SDP -> FLV)"]
+        D["StreamManager"]
     end
-    subgraph Выходы
-        E[RTMP]
-        F[SRT]
-        G[File (FLV)]
+    subgraph Outputs ["Выходы"]
+        E["RTMP"]
+        F["SRT"]
+        G["File (FLV)"]
     end
-    A -- SDP/медиа --> B
-    B -- SDP --> C
-    C -- FLV packets --> D
-    D -- потоки --> E
-    D -- потоки --> F
-    D -- потоки --> G
+    A -->|"SDP/медиа"| B
+    B -->|"SDP"| C
+    C -->|"FLV packets"| D
+    D -->|"потоки"| E
+    D -->|"потоки"| F
+    D -->|"потоки"| G
 ```
 
 ### Требования к ffmpeg
@@ -371,7 +371,7 @@ v=0
 
 ## Возможности
 
-- 📥 Прием RTMP-потоков SRT-потоков
+- 📥 Прием RTMP, SRT и WHIP потоков
 - 📤 Ретрансляция в RTMP и SRT
 - 💾 Запись потоков в FLV-файлы
 - 🌐 Веб-интерфейс управления 
