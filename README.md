@@ -6,6 +6,7 @@ A server for relaying RTMP streams with SRT output support and a web management 
 
 - 📥 Accepts RTMP and SRT streams
 - 📤 Relays to RTMP and SRT outputs
+- 💾 Writes streams to FLV files
 - 🌐 Web management interface
 - 🔧 Dynamic management of inputs and outputs (add/remove/force reconnect without restart)
 - 🔄 Universal fallback for RTMP output from SRT (automatic PID detection by content, robust to missing PMT/PAT, supports any PID)
@@ -162,7 +163,19 @@ srt_settings:
 log_to_file: true
 log_file: "server.log"
 reconnect_interval: 5
+
+# Example of inputs
+# You can also add/remove them via the web interface
+inputs:
+  - name: obs_stream
+    url_path: /live/obs
+    outputs:
+      - rtmp://a.rtmp.youtube.com/live2
+      - srt://some.srt.server:9000
+      - file://records/my_stream.flv
 ```
+
+The server can start with an empty `inputs` list, and they can be added later via the web interface or API.
 
 ## Project Structure
 
@@ -360,6 +373,7 @@ v=0
 
 - 📥 Прием RTMP-потоков SRT-потоков
 - 📤 Ретрансляция в RTMP и SRT
+- 💾 Запись потоков в FLV-файлы
 - 🌐 Веб-интерфейс управления 
 - 🔧 Динамическое управление входами и выходами (добавление/удаление/force reconnect без рестарта)
 - 🔄 Универсальный fallback для RTMP-выхода из SRT (автоматическое определение PID по содержимому, устойчивость к отсутствию PMT/PAT, поддержка любых PID)
@@ -516,7 +530,19 @@ srt_settings:
 log_to_file: true
 log_file: "server.log"
 reconnect_interval: 5
+
+# Example of inputs
+# You can also add/remove them via the web interface
+inputs:
+  - name: obs_stream
+    url_path: /live/obs
+    outputs:
+      - rtmp://a.rtmp.youtube.com/live2
+      - srt://some.srt.server:9000
+      - file://records/my_stream.flv
 ```
+
+The server can start with an empty `inputs` list, and they can be added later via the web interface or API.
 
 ## Структура проекта
 
@@ -687,76 +713,6 @@ go project/
     -d '{"srt_settings":{"latency":200}}'
   ```
 - `POST /api/settings/reload` — reload from file
-  ```bash
-  curl -u admin:secret -X POST http://localhost:8080/api/settings/reload
-  ```
-
-## API Эндпоинты — Примеры запросов
-
-### Входы
-- `GET /api/inputs` — список входов
-  ```bash
-  curl -u admin:secret http://localhost:8080/api/inputs
-  ```
-- `POST /api/inputs/add` — добавить вход
-  ```bash
-  curl -u admin:secret -X POST http://localhost:8080/api/inputs/add \
-    -H 'Content-Type: application/json' \
-    -d '{"name":"obs","url_path":"/live/stream","outputs":["rtmp://...","srt://..."]}'
-  ```
-- `GET /api/inputs/remove?name=...` — удалить вход
-  ```bash
-  curl -u admin:secret "http://localhost:8080/api/inputs/remove?name=obs"
-  ```
-- `POST /api/inputs/update_outputs` — обновить выходы для входа
-  ```bash
-  curl -u admin:secret -X POST http://localhost:8080/api/inputs/update_outputs \
-    -H 'Content-Type: application/json' \
-    -d '{"name":"obs","outputs":["rtmp://...","srt://..."]}'
-  ```
-
-### Статус
-- `GET /api/status/all` — статус всех входов
-  ```bash
-  curl -u admin:secret http://localhost:8080/api/status/all
-  ```
-- `GET /api/status?name=...` — статус конкретного входа
-  ```bash
-  curl -u admin:secret "http://localhost:8080/api/status?name=obs"
-  ```
-
-### Выходы
-- `POST /api/outputs/add` — добавить выход
-  ```bash
-  curl -u admin:secret -X POST http://localhost:8080/api/outputs/add \
-    -H 'Content-Type: application/json' \
-    -d '{"name":"obs","url":"rtmp://example.com/live/stream"}'
-  ```
-- `POST /api/outputs/remove` — удалить выход
-  ```bash
-  curl -u admin:secret -X POST http://localhost:8080/api/outputs/remove \
-    -H 'Content-Type: application/json' \
-    -d '{"name":"obs","url":"rtmp://example.com/live/stream"}'
-  ```
-- `POST /api/outputs/reconnect` — force reconnect output
-  ```bash
-  curl -u admin:secret -X POST http://localhost:8080/api/outputs/reconnect \
-    -H 'Content-Type: application/json' \
-    -d '{"name":"obs","url":"rtmp://example.com/live/stream"}'
-  ```
-
-### Настройки
-- `GET /api/settings` — получить настройки
-  ```bash
-  curl -u admin:secret http://localhost:8080/api/settings
-  ```
-- `PUT /api/settings` — обновить настройки
-  ```bash
-  curl -u admin:secret -X PUT http://localhost:8080/api/settings \
-    -H 'Content-Type: application/json' \
-    -d '{"srt_settings":{"latency":200}}'
-  ```
-- `POST /api/settings/reload` — перезагрузить из файла
   ```bash
   curl -u admin:secret -X POST http://localhost:8080/api/settings/reload
   ```

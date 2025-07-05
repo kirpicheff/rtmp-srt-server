@@ -3,12 +3,14 @@ package main
 import (
 	"bytes"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
 	srt "github.com/datarhei/gosrt"
 	"github.com/nareix/joy4/av"
+	"github.com/nareix/joy4/format/flv"
 	"github.com/nareix/joy4/format/rtmp"
 	"github.com/nareix/joy4/format/ts"
 )
@@ -104,7 +106,63 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 
 					log.Printf("Trying to connect to %s", url)
 
-					if strings.HasPrefix(url, "rtmp://") {
+					if strings.HasPrefix(url, "file://") {
+						filename := strings.TrimPrefix(url, "file://")
+						file, err := os.Create(filename)
+						if err != nil {
+							log.Printf("Failed to create file %s: %v", filename, err)
+							time.Sleep(5 * time.Second)
+							continue // Повторная попытка
+						}
+
+						sm.SetOutputActive(inputCfg.Name, url, true)
+						log.Printf("Writing FLV to file: %s", filename)
+
+						muxer := flv.NewMuxer(file)
+						err = muxer.WriteHeader(streams)
+						if err != nil {
+							log.Printf("Failed to write FLV header to file %s: %v", filename, err)
+							file.Close()
+							sm.SetOutputActive(inputCfg.Name, url, false)
+							time.Sleep(5 * time.Second)
+							continue
+						}
+
+						for {
+							select {
+							case <-stop:
+								if err := muxer.WriteTrailer(); err != nil {
+									log.Printf("Failed to write FLV trailer to file %s: %v", filename, err)
+								}
+								file.Close()
+								sm.SetOutputActive(inputCfg.Name, url, false)
+								log.Printf("File output stopped: %s", filename)
+								return
+							case pkt, ok := <-ch:
+								if !ok {
+									if err := muxer.WriteTrailer(); err != nil {
+										log.Printf("Failed to write FLV trailer to file %s: %v", filename, err)
+									}
+									file.Close()
+									sm.SetOutputActive(inputCfg.Name, url, false)
+									return
+								}
+								err = muxer.WritePacket(pkt)
+								if err != nil {
+									log.Printf("Write error to file %s: %v", filename, err)
+									if err := muxer.WriteTrailer(); err != nil {
+										log.Printf("Failed to write FLV trailer to file %s: %v", filename, err)
+									}
+									file.Close()
+									sm.SetOutputActive(inputCfg.Name, url, false)
+									time.Sleep(5 * time.Second)
+									break // Выход из внутреннего цикла для переподключения
+								}
+								totalBytes += int64(len(pkt.Data))
+								sm.UpdateOutputBitrate(inputCfg.Name, url, totalBytes)
+							}
+						}
+					} else if strings.HasPrefix(url, "rtmp://") {
 						dstConn, err := rtmp.Dial(url)
 						if err != nil {
 							log.Printf("Failed to connect to %s: %v", url, err)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -114,16 +115,18 @@ func (s *SRTServer) handleConnection(conn srt.Conn) {
 	defer s.manager.SetStatusActive(inputName, false)
 
 	// Находим SRT и RTMP выходы
-	var srtOutputs, rtmpOutputs []string
+	var srtOutputs, rtmpOutputs, fileOutputs []string
 	for _, output := range inputCfg.Outputs {
 		if strings.HasPrefix(output, "srt://") {
 			srtOutputs = append(srtOutputs, output)
 		} else if strings.HasPrefix(output, "rtmp://") {
 			rtmpOutputs = append(rtmpOutputs, output)
+		} else if strings.HasPrefix(output, "file://") {
+			fileOutputs = append(fileOutputs, output)
 		}
 	}
 
-	if len(srtOutputs) == 0 && len(rtmpOutputs) == 0 {
+	if len(srtOutputs) == 0 && len(rtmpOutputs) == 0 && len(fileOutputs) == 0 {
 		log.Printf("[SRT] No outputs configured for %s", inputName)
 		return
 	}
@@ -160,6 +163,16 @@ func (s *SRTServer) handleConnection(conn srt.Conn) {
 		stopChannels[outputURL] = stop
 		s.wg.Add(1)
 		go s.handleRTMPOutput(inputName, outputURL, ch, stop)
+	}
+
+	// Добавляем обработку file:// выходов
+	for _, outputURL := range fileOutputs {
+		ch := make(chan []byte, 1000)
+		stop := make(chan struct{})
+		outputChannels[outputURL] = ch
+		stopChannels[outputURL] = stop
+		s.wg.Add(1)
+		go s.handleFileOutput(inputName, outputURL, ch, stop)
 	}
 
 	// Читаем данные из входящего SRT соединения и отправляем во все выходы
@@ -564,5 +577,37 @@ func (s *SRTServer) processRTMPStream(reader io.Reader, dstConn *rtmp.Conn, inpu
 
 		totalBytes += int64(len(pkt.Data))
 		s.manager.UpdateOutputBitrate(inputName, outputURL, totalBytes)
+	}
+}
+
+// Функция для обработки записи в файл
+func (s *SRTServer) handleFileOutput(inputName, outputURL string, dataCh <-chan []byte, stopCh <-chan struct{}) {
+	defer s.wg.Done()
+
+	filePath := strings.TrimPrefix(outputURL, "file://")
+	file, err := os.Create(filePath)
+	if err != nil {
+		log.Printf("[SRT] Failed to create file %s: %v", filePath, err)
+		return
+	}
+	defer file.Close()
+
+	log.Printf("[SRT] Writing to file: %s", filePath)
+
+	for {
+		select {
+		case <-stopCh:
+			log.Printf("[SRT] File output stopped: %s", filePath)
+			return
+		case data, ok := <-dataCh:
+			if !ok {
+				return
+			}
+			_, err := file.Write(data)
+			if err != nil {
+				log.Printf("[SRT] Write error to file %s: %v", filePath, err)
+				return
+			}
+		}
 	}
 }
