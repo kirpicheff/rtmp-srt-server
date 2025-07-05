@@ -345,6 +345,32 @@ func (w *WHIPServer) startFFmpegPipeline(session *WHIPSession, inputCfg *InputCf
 		session.outputMgr.AddOutput(url, 500, w.createOutputPusher(session, url))
 	}
 
+	// Горутина для динамического обновления выходов
+	updateTicker := time.NewTicker(2 * time.Second)
+	defer updateTicker.Stop()
+
+	go func() {
+		for {
+			select {
+			case <-session.stopCh:
+				return
+			case <-updateTicker.C:
+				// Синхронизируем выходы с inputCfg.Outputs
+				current := make(map[string]struct{})
+				for _, url := range inputCfg.Outputs {
+					current[url] = struct{}{}
+					w.manager.RegisterOutput(session.inputName, url)
+					session.outputMgr.AddOutput(url, 500, w.createOutputPusher(session, url))
+				}
+				for url := range session.outputMgr.AllOutputs() {
+					if _, ok := current[url]; !ok {
+						session.outputMgr.RemoveOutput(url)
+					}
+				}
+			}
+		}
+	}()
+
 	// Читаем FLV из stdout и отправляем в выходы только если они есть
 	if hasOutputs && stdout != nil {
 		w.processFLVStream(stdout, session, inputCfg)

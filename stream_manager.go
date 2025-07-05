@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -114,8 +115,17 @@ func (sm *StreamManager) ListInputs() []InputCfg {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	var inputs []InputCfg
-	for _, v := range sm.inputs {
-		inputs = append(inputs, *v)
+
+	// Собираем имена и сортируем их для стабильного порядка
+	var names []string
+	for name := range sm.inputs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	// Добавляем входы в отсортированном порядке
+	for _, name := range names {
+		inputs = append(inputs, *sm.inputs[name])
 	}
 	return inputs
 }
@@ -176,7 +186,17 @@ func (sm *StreamManager) GetAllStatuses() []*StreamStatus {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	var list []*StreamStatus
-	for _, s := range sm.status {
+
+	// Собираем имена и сортируем их для стабильного порядка
+	var names []string
+	for name := range sm.status {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	// Добавляем статусы в отсортированном порядке
+	for _, name := range names {
+		s := sm.status[name]
 		copy := *s
 		copy.Outputs = sm.GetOutputsStatus(s.Name)
 		list = append(list, &copy)
@@ -282,21 +302,52 @@ func (sm *StreamManager) GetOutputsStatus(inputName string) []*OutputStatus {
 	defer sm.mu.RUnlock()
 	var list []*OutputStatus
 	if outMap, ok := sm.outputs[inputName]; ok {
-		for _, out := range outMap {
-			copy := *out
-			// Сбрасываем внутренние поля при отдаче статуса
-			copy.prevBytes = 0
-			copy.prevTime = time.Time{}
-			if out.Active && !out.startTime.IsZero() {
-				d := time.Since(out.startTime)
-				h := int(d.Hours())
-				m := int(d.Minutes()) % 60
-				s := int(d.Seconds()) % 60
-				copy.Uptime = fmt.Sprintf("%02d:%02d:%02d", h, m, s)
-			} else {
-				copy.Uptime = "00:00:00"
+		// Получаем исходный порядок из конфигурации входа
+		if input, inputOk := sm.inputs[inputName]; inputOk {
+			// Используем порядок из inputCfg.Outputs
+			for _, url := range input.Outputs {
+				if out, outOk := outMap[url]; outOk {
+					copy := *out
+					// Сбрасываем внутренние поля при отдаче статуса
+					copy.prevBytes = 0
+					copy.prevTime = time.Time{}
+					if out.Active && !out.startTime.IsZero() {
+						d := time.Since(out.startTime)
+						h := int(d.Hours())
+						m := int(d.Minutes()) % 60
+						s := int(d.Seconds()) % 60
+						copy.Uptime = fmt.Sprintf("%02d:%02d:%02d", h, m, s)
+					} else {
+						copy.Uptime = "00:00:00"
+					}
+					list = append(list, &copy)
+				}
 			}
-			list = append(list, &copy)
+		} else {
+			// Если входа нет в конфигурации, используем алфавитный порядок как fallback
+			var urls []string
+			for url := range outMap {
+				urls = append(urls, url)
+			}
+			sort.Strings(urls)
+
+			for _, url := range urls {
+				out := outMap[url]
+				copy := *out
+				// Сбрасываем внутренние поля при отдаче статуса
+				copy.prevBytes = 0
+				copy.prevTime = time.Time{}
+				if out.Active && !out.startTime.IsZero() {
+					d := time.Since(out.startTime)
+					h := int(d.Hours())
+					m := int(d.Minutes()) % 60
+					s := int(d.Seconds()) % 60
+					copy.Uptime = fmt.Sprintf("%02d:%02d:%02d", h, m, s)
+				} else {
+					copy.Uptime = "00:00:00"
+				}
+				list = append(list, &copy)
+			}
 		}
 	}
 	return list

@@ -1,3 +1,225 @@
+// Система локализации
+const translations = {
+    ru: {
+        // Заголовок
+        'header.subtitle': 'Управление трансляциями и настройками сервера',
+
+        // Навигация
+        'nav.status': '📊 Статус',
+        'nav.inputs': '📥 Входы',
+        'nav.outputs': '📤 Выходы',
+        'nav.settings': '⚙️ Настройки',
+
+        // Общие
+        'common.loading': 'Загрузка...',
+        'common.refresh': 'Обновить',
+        'common.add': 'Добавить',
+        'common.remove': 'Удалить',
+        'common.reconnect': 'Реконнект',
+        'common.save': 'Сохранить',
+        'common.cancel': 'Отмена',
+        'common.active': 'Активен',
+        'common.inactive': 'Неактивен',
+        'common.bitrate': 'Битрейт',
+        'common.uptime': 'Аптайм',
+        'common.errors': 'Ошибки',
+        'common.status': 'Статус',
+        'common.name': 'Имя',
+        'common.url': 'URL',
+        'common.path': 'Путь',
+        'common.outputs': 'Выходы',
+        'common.connections': 'Подключения',
+        'common.lastUpdate': 'Последнее обновление',
+        'common.updated': 'обновлено',
+
+        // Статус
+        'status.title': 'Общий статус сервера',
+        'status.noInputs': 'Нет активных входов',
+        'status.noOutputs': 'Нет выходов',
+        'status.loadError': 'Ошибка загрузки статуса',
+
+        // Входы
+        'inputs.title': 'Управление входами',
+        'inputs.addNew': 'Добавить новый вход',
+        'inputs.inputName': 'Имя входа',
+        'inputs.rtmpPath': 'Путь RTMP',
+        'inputs.outputsPlaceholder': 'srt://example.com:9000\nrtmp://example.com/live/stream',
+        'inputs.outputsLabel': 'Выходы (по одному на строку):',
+        'inputs.existing': 'Существующие входы',
+        'inputs.noInputs': 'Нет входов',
+        'inputs.addSuccess': 'Вход успешно добавлен',
+        'inputs.removeSuccess': 'Вход успешно удален',
+        'inputs.removeConfirm': 'Удалить вход',
+        'inputs.addError': 'Ошибка добавления входа',
+        'inputs.removeError': 'Ошибка удаления входа',
+        'inputs.loadError': 'Ошибка загрузки входов',
+
+        // Выходы
+        'outputs.title': 'Управление выходами',
+        'outputs.addOutput': 'Добавить выход',
+        'outputs.input': 'Вход',
+        'outputs.outputUrl': 'URL выхода',
+        'outputs.management': 'Управление выходами',
+        'outputs.noInputsForManagement': 'Нет входов для управления выходами',
+        'outputs.noActiveInputs': 'Нет активных входов',
+        'outputs.addSuccess': 'Выход успешно добавлен',
+        'outputs.removeSuccess': 'Выход успешно удален',
+        'outputs.reconnectInitiated': 'Реконнект инициирован',
+        'outputs.removeConfirm': 'Удалить выход',
+        'outputs.addError': 'Ошибка добавления выхода',
+        'outputs.removeError': 'Ошибка удаления выхода',
+        'outputs.reconnectError': 'Ошибка реконнекта',
+        'outputs.loadError': 'Ошибка загрузки выходов',
+
+        // Настройки
+        'settings.title': 'Глобальные настройки',
+        'settings.srt': 'Настройки SRT',
+        'settings.latency': 'Latency (мс):',
+        'settings.timeout': 'Connect Timeout (мс):',
+        'settings.passphrase': 'Passphrase:',
+        'settings.streamId': 'Stream ID:',
+        'settings.logging': 'Настройки логирования',
+        'settings.logToFile': 'Логировать в файл',
+        'settings.logFile': 'Файл лога:',
+        'settings.reconnectInterval': 'Интервал переподключения',
+        'settings.reconnectIntervalLabel': 'Интервал (секунды):',
+        'settings.saveSuccess': 'Настройки успешно сохранены',
+        'settings.reloadSuccess': 'Настройки перезагружены',
+        'settings.saveError': 'Ошибка сохранения настроек',
+        'settings.reloadError': 'Ошибка перезагрузки настроек',
+        'settings.loadError': 'Ошибка загрузки настроек',
+        'settings.reload': 'Перезагрузить из файла'
+    },
+    en: {
+        // Header
+        'header.subtitle': 'Stream and server settings management',
+
+        // Navigation
+        'nav.status': '📊 Status',
+        'nav.inputs': '📥 Inputs',
+        'nav.outputs': '📤 Outputs',
+        'nav.settings': '⚙️ Settings',
+
+        // Common
+        'common.loading': 'Loading...',
+        'common.refresh': 'Refresh',
+        'common.add': 'Add',
+        'common.remove': 'Remove',
+        'common.reconnect': 'Reconnect',
+        'common.save': 'Save',
+        'common.cancel': 'Cancel',
+        'common.active': 'Active',
+        'common.inactive': 'Inactive',
+        'common.bitrate': 'Bitrate',
+        'common.uptime': 'Uptime',
+        'common.errors': 'Errors',
+        'common.status': 'Status',
+        'common.name': 'Name',
+        'common.url': 'URL',
+        'common.path': 'Path',
+        'common.outputs': 'Outputs',
+        'common.connections': 'Connections',
+        'common.lastUpdate': 'Last update',
+        'common.updated': 'updated',
+
+        // Status
+        'status.title': 'Server Status Overview',
+        'status.noInputs': 'No active inputs',
+        'status.noOutputs': 'No outputs',
+        'status.loadError': 'Error loading status',
+
+        // Inputs
+        'inputs.title': 'Input Management',
+        'inputs.addNew': 'Add New Input',
+        'inputs.inputName': 'Input Name',
+        'inputs.rtmpPath': 'RTMP Path',
+        'inputs.outputsPlaceholder': 'srt://example.com:9000\nrtmp://example.com/live/stream',
+        'inputs.outputsLabel': 'Outputs (one per line):',
+        'inputs.existing': 'Existing Inputs',
+        'inputs.noInputs': 'No inputs',
+        'inputs.addSuccess': 'Input successfully added',
+        'inputs.removeSuccess': 'Input successfully removed',
+        'inputs.removeConfirm': 'Remove input',
+        'inputs.addError': 'Error adding input',
+        'inputs.removeError': 'Error removing input',
+        'inputs.loadError': 'Error loading inputs',
+
+        // Outputs
+        'outputs.title': 'Output Management',
+        'outputs.addOutput': 'Add Output',
+        'outputs.input': 'Input',
+        'outputs.outputUrl': 'Output URL',
+        'outputs.management': 'Output Management',
+        'outputs.noInputsForManagement': 'No inputs available for output management',
+        'outputs.noActiveInputs': 'No active inputs',
+        'outputs.addSuccess': 'Output successfully added',
+        'outputs.removeSuccess': 'Output successfully removed',
+        'outputs.reconnectInitiated': 'Reconnect initiated',
+        'outputs.removeConfirm': 'Remove output',
+        'outputs.addError': 'Error adding output',
+        'outputs.removeError': 'Error removing output',
+        'outputs.reconnectError': 'Reconnect error',
+        'outputs.loadError': 'Error loading outputs',
+
+        // Settings
+        'settings.title': 'Global Settings',
+        'settings.srt': 'SRT Settings',
+        'settings.latency': 'Latency (ms):',
+        'settings.timeout': 'Connect Timeout (ms):',
+        'settings.passphrase': 'Passphrase:',
+        'settings.streamId': 'Stream ID:',
+        'settings.logging': 'Logging Settings',
+        'settings.logToFile': 'Log to file',
+        'settings.logFile': 'Log file:',
+        'settings.reconnectInterval': 'Reconnect Interval',
+        'settings.reconnectIntervalLabel': 'Interval (seconds):',
+        'settings.saveSuccess': 'Settings successfully saved',
+        'settings.reloadSuccess': 'Settings reloaded',
+        'settings.saveError': 'Error saving settings',
+        'settings.reloadError': 'Error reloading settings',
+        'settings.loadError': 'Error loading settings',
+        'settings.reload': 'Reload from file'
+    }
+};
+
+let currentLanguage = localStorage.getItem('language') || 'ru';
+
+// Функция перевода
+function t(key) {
+    return translations[currentLanguage][key] || key;
+}
+
+// Функция применения переводов
+function applyTranslations() {
+    // Переводим элементы с data-i18n
+    document.querySelectorAll('[data-i18n]').forEach(element => {
+        const key = element.getAttribute('data-i18n');
+        element.textContent = t(key);
+    });
+
+    // Переводим атрибуты title с data-i18n-title
+    document.querySelectorAll('[data-i18n-title]').forEach(element => {
+        const key = element.getAttribute('data-i18n-title');
+        element.title = t(key);
+    });
+
+    // Переводим placeholder с data-i18n-placeholder
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(element => {
+        const key = element.getAttribute('data-i18n-placeholder');
+        element.placeholder = t(key);
+    });
+}
+
+// Функция смены языка
+function changeLanguage(lang) {
+    currentLanguage = lang;
+    localStorage.setItem('language', lang);
+    applyTranslations();
+
+    // Перезагружаем текущую вкладку чтобы обновить динамический контент
+    loadCurrentTab();
+}
+
 // Конфигурация API
 const API_BASE = '/api';
 const API_CREDENTIALS = btoa('admin:secret'); // В продакшене лучше получать через форму входа
@@ -9,9 +231,21 @@ let refreshInterval;
 // Инициализация приложения
 document.addEventListener('DOMContentLoaded', function () {
     setupNavigation();
+    setupLanguageSwitcher();
+    applyTranslations();
     loadCurrentTab();
     startAutoRefresh();
 });
+
+// Настройка переключателя языка
+function setupLanguageSwitcher() {
+    const languageSelect = document.getElementById('language-select');
+    languageSelect.value = currentLanguage;
+
+    languageSelect.addEventListener('change', function () {
+        changeLanguage(this.value);
+    });
+}
 
 // Настройка навигации
 function setupNavigation() {
@@ -55,7 +289,7 @@ function loadCurrentTab() {
             loadInputs();
             break;
         case 'outputs':
-            loadOutputs();
+            loadOutputsInitial(); // Используем специальную функцию для первоначальной загрузки
             break;
         case 'settings':
             loadSettings();
@@ -65,18 +299,24 @@ function loadCurrentTab() {
 
 // Автообновление данных
 function startAutoRefresh() {
-    refreshInterval = setInterval(() => {
+    refreshInterval = setInterval(async () => {
         if (currentTab === 'status') {
             loadStatus();
         } else if (currentTab === 'outputs') {
-            loadOutputs();
+            // Обновляем только статусы выходов, не трогаем форму
+            loadOutputs(); // Используем упрощенную функцию
         }
     }, 5000); // Обновляем статус каждые 5 секунд
 }
 
 // Обновление текущей вкладки
 function refreshCurrentTab() {
-    loadCurrentTab();
+    if (currentTab === 'outputs') {
+        // Для выходов обновляем только статусы
+        loadOutputsInitial();
+    } else {
+        loadCurrentTab();
+    }
 }
 
 // API функции
@@ -113,7 +353,7 @@ async function loadStatus() {
         const statuses = await apiRequest('/status/all');
         displayStatus(statuses);
     } catch (error) {
-        showError('Ошибка загрузки статуса: ' + error.message);
+        showError(t('status.loadError') + ': ' + error.message);
     }
 }
 
@@ -123,13 +363,13 @@ function displayStatus(statuses) {
     const currentTime = new Date().toLocaleTimeString();
 
     if (!statuses || statuses.length === 0) {
-        container.innerHTML = '<div class="alert alert-error">Нет активных входов</div>';
+        container.innerHTML = `<div class="alert alert-error">${t('status.noInputs')}</div>`;
         return;
     }
 
     const html = `
         <div style="margin-bottom: 20px; color: #6c757d; font-size: 0.9em;">
-            Последнее обновление: ${currentTime}
+            ${t('common.lastUpdate')}: ${currentTime}
         </div>
         ${statuses.map(input => `
             <div class="status-card">
@@ -137,32 +377,32 @@ function displayStatus(statuses) {
                     <span class="status-indicator ${input.active ? 'status-active' : 'status-inactive'}"></span>
                     ${input.name}
                 </h3>
-                <p><strong>Путь:</strong> ${input.url_path}</p>
-                <p><strong>Статус:</strong> ${input.active ? 'Активен' : 'Неактивен'}</p>
-                <p><strong>Подключения:</strong> ${input.connections}</p>
-                <p><strong>Ошибки:</strong> ${input.error_count}</p>
+                <p><strong>${t('common.path')}:</strong> ${input.url_path}</p>
+                <p><strong>${t('common.status')}:</strong> ${input.active ? t('common.active') : t('common.inactive')}</p>
+                <p><strong>${t('common.connections')}:</strong> ${input.connections}</p>
+                <p><strong>${t('common.errors')}:</strong> ${input.error_count}</p>
                 
                 ${input.outputs && input.outputs.length > 0 ? `
-                    <h4 style="margin-top: 15px; margin-bottom: 10px;">Выходы:</h4>
+                    <h4 style="margin-top: 15px; margin-bottom: 10px;">${t('common.outputs')}:</h4>
                     ${input.outputs.map(output => `
                         <div class="output-item">
                             <div class="output-info">
                                 <div class="output-url">${output.url}</div>
                                 <div class="output-stats">
-                                    Статус: <span style="color: ${output.active ? '#27ae60' : '#e74c3c'}; font-weight: bold;">${output.active ? 'Активен' : 'Неактивен'}</span> | 
-                                    Битрейт: <strong>${(output.bitrate_kbps || 0).toFixed(1)} kbps</strong> | 
-                                    Аптайм: <strong>${output.uptime || '00:00:00'}</strong> | 
-                                    Ошибки: <strong>${output.error_count || 0}</strong>
+                                    ${t('common.status')}: <span style="color: ${output.active ? '#27ae60' : '#e74c3c'}; font-weight: bold;">${output.active ? t('common.active') : t('common.inactive')}</span> | 
+                                    ${t('common.bitrate')}: <strong>${(output.bitrate_kbps || 0).toFixed(1)} kbps</strong> | 
+                                    ${t('common.uptime')}: <strong>${output.uptime || '00:00:00'}</strong> | 
+                                    ${t('common.errors')}: <strong>${output.error_count || 0}</strong>
                                 </div>
                             </div>
                             <div class="output-actions">
-                                <button class="btn btn-warning btn-small" onclick="reconnectOutput('${input.name}', '${output.url}')" title="Реконнект">
+                                <button class="btn btn-warning btn-small" onclick="reconnectOutput('${input.name}', '${output.url}')" title="${t('common.reconnect')}">
                                     🔄
                                 </button>
                             </div>
                         </div>
                     `).join('')}
-                ` : '<p>Нет выходов</p>'}
+                ` : `<p>${t('status.noOutputs')}</p>`}
             </div>
         `).join('')}
     `;
@@ -176,7 +416,7 @@ async function loadInputs() {
         const inputs = await apiRequest('/inputs');
         displayInputs(inputs);
     } catch (error) {
-        showError('Ошибка загрузки входов: ' + error.message);
+        showError(t('inputs.loadError') + ': ' + error.message);
     }
 }
 
@@ -186,35 +426,35 @@ function displayInputs(inputs) {
 
     const html = `
         <div class="form-group">
-            <h3>Добавить новый вход</h3>
+            <h3>${t('inputs.addNew')}</h3>
             <form id="add-input-form">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Имя входа:</label>
+                        <label>${t('inputs.inputName')}:</label>
                         <input type="text" class="form-control" id="input-name" placeholder="например: obs" required>
                     </div>
                     <div class="form-group">
-                        <label>Путь RTMP:</label>
+                        <label>${t('inputs.rtmpPath')}:</label>
                         <input type="text" class="form-control" id="input-path" placeholder="/live/stream" required>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Выходы (по одному на строку):</label>
-                    <textarea class="form-control" id="input-outputs" rows="3" placeholder="srt://example.com:9000&#10;rtmp://example.com/live/stream"></textarea>
+                    <label>${t('inputs.outputsLabel')}</label>
+                    <textarea class="form-control" id="input-outputs" rows="3" placeholder="${t('inputs.outputsPlaceholder')}"></textarea>
                 </div>
-                <button type="submit" class="btn btn-success">Добавить вход</button>
+                <button type="submit" class="btn btn-success">${t('common.add')} ${t('nav.inputs').replace('📥 ', '').toLowerCase()}</button>
             </form>
         </div>
         
         <div class="form-group">
-            <h3>Существующие входы</h3>
-            ${inputs.length === 0 ? '<p>Нет входов</p>' : inputs.map(input => `
+            <h3>${t('inputs.existing')}</h3>
+            ${inputs.length === 0 ? `<p>${t('inputs.noInputs')}</p>` : inputs.map(input => `
                 <div class="output-item">
                     <div class="output-info">
                         <div class="output-url">${input.Name || input.name}</div>
                         <div class="output-stats">
-                            Путь: ${input.URLPath || input.url_path} | 
-                            Выходов: ${(input.Outputs || input.outputs || []).length}
+                            ${t('common.path')}: ${input.URLPath || input.url_path} | 
+                            ${t('common.outputs')}: ${(input.Outputs || input.outputs || []).length}
                         </div>
                     </div>
                     <div class="output-actions">
@@ -252,101 +492,86 @@ async function addInput(event) {
             })
         });
 
-        showSuccess('Вход успешно добавлен');
+        showSuccess(t('inputs.addSuccess'));
         loadInputs();
     } catch (error) {
-        showError('Ошибка добавления входа: ' + error.message);
+        showError(t('inputs.addError') + ': ' + error.message);
     }
 }
 
 // Удаление входа
 async function removeInput(name) {
-    if (!confirm(`Удалить вход "${name}"?`)) return;
+    if (!confirm(`${t('inputs.removeConfirm')} "${name}"?`)) return;
 
     try {
         await apiRequest(`/inputs/remove?name=${encodeURIComponent(name)}`);
-        showSuccess('Вход успешно удален');
+        showSuccess(t('inputs.removeSuccess'));
         loadInputs();
     } catch (error) {
-        showError('Ошибка удаления входа: ' + error.message);
+        showError(t('inputs.removeError') + ': ' + error.message);
     }
 }
 
-// Загрузка выходов
-async function loadOutputs() {
+// Первоначальная загрузка выходов (при переключении на вкладку)
+async function loadOutputsInitial() {
     try {
         const inputs = await apiRequest('/inputs');
         const statuses = await apiRequest('/status/all');
-        displayOutputs(inputs, statuses);
+
+        // Создаем форму только один раз или если она не существует
+        if (!document.getElementById('add-output-form')) {
+            createOutputForm(inputs);
+        } else {
+            // Обновляем только список входов в форме
+            updateOutputFormInputs(inputs);
+        }
+
+        // Обновляем статусы выходов
+        displayOutputsStatus(statuses);
     } catch (error) {
-        showError('Ошибка загрузки выходов: ' + error.message);
-        // Показываем индикатор загрузки при ошибке
-        document.getElementById('outputs-content').innerHTML = '<div class="loading">Ошибка загрузки данных...</div>';
+        showError(t('outputs.loadError') + ': ' + error.message);
+        document.getElementById('outputs-status-container').innerHTML = `<div class="loading">${t('outputs.loadError')}...</div>`;
     }
 }
 
-// Отображение выходов
-function displayOutputs(inputs, statuses) {
-    const container = document.getElementById('outputs-content');
+// Загрузка выходов (старая функция - теперь используется только для обновления статусов)
+async function loadOutputs() {
+    try {
+        const statuses = await apiRequest('/status/all');
+        displayOutputsStatus(statuses);
+    } catch (error) {
+        showError(t('outputs.loadError') + ': ' + error.message);
+        document.getElementById('outputs-status-container').innerHTML = `<div class="loading">${t('outputs.loadError')}...</div>`;
+    }
+}
+
+// Создание формы добавления выхода (один раз)
+function createOutputForm(inputs) {
+    const container = document.getElementById('add-output-form-container');
 
     if (inputs.length === 0) {
-        container.innerHTML = '<div class="alert alert-error">Нет входов для управления выходами</div>';
+        container.innerHTML = `<div class="alert alert-error">${t('outputs.noInputsForManagement')}</div>`;
         return;
     }
 
-    const currentTime = new Date().toLocaleTimeString();
-
     const html = `
         <div class="form-group">
-            <h3>Добавить выход</h3>
+            <h3>${t('outputs.addOutput')}</h3>
             <form id="add-output-form">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Вход:</label>
+                        <label>${t('outputs.input')}:</label>
                         <select class="form-control" id="output-input" required>
                             ${inputs.map(input => `<option value="${input.Name || input.name}">${input.Name || input.name}</option>`).join('')}
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>URL выхода:</label>
+                        <label>${t('outputs.outputUrl')}:</label>
                         <input type="text" class="form-control" id="output-url" placeholder="srt://example.com:9000" required>
                     </div>
                 </div>
-                <button type="submit" class="btn btn-success">Добавить выход</button>
+                <button type="submit" class="btn btn-success">${t('common.add')} ${t('nav.outputs').replace('📤 ', '').toLowerCase()}</button>
             </form>
-        </div>
-        
-        <div class="form-group">
-            <h3>Управление выходами <small style="color: #6c757d;">(обновлено: ${currentTime})</small></h3>
-            ${statuses.length === 0 ? '<p>Нет активных входов</p>' : statuses.map(input => `
-                <div class="status-card">
-                    <h3>
-                        <span class="status-indicator ${input.active ? 'status-active' : 'status-inactive'}"></span>
-                        ${input.name}
-                    </h3>
-                    ${input.outputs && input.outputs.length > 0 ? input.outputs.map(output => `
-                        <div class="output-item">
-                            <div class="output-info">
-                                <div class="output-url">${output.url}</div>
-                                <div class="output-stats">
-                                    Статус: <span style="color: ${output.active ? '#27ae60' : '#e74c3c'}; font-weight: bold;">${output.active ? 'Активен' : 'Неактивен'}</span> | 
-                                    Битрейт: <strong>${(output.bitrate_kbps || 0).toFixed(1)} kbps</strong> | 
-                                    Аптайм: <strong>${output.uptime || '00:00:00'}</strong> | 
-                                    Ошибки: <strong>${output.error_count || 0}</strong>
-                                </div>
-                            </div>
-                            <div class="output-actions">
-                                <button class="btn btn-warning btn-small" onclick="reconnectOutput('${input.name}', '${output.url}')" title="Реконнект">
-                                    🔄
-                                </button>
-                                <button class="btn btn-danger btn-small" onclick="removeOutput('${input.name}', '${output.url}')" title="Удалить">
-                                    🗑️
-                                </button>
-                            </div>
-                        </div>
-                    `).join('') : '<p>Нет выходов</p>'}
-                </div>
-            `).join('')}
         </div>
     `;
 
@@ -357,6 +582,62 @@ function displayOutputs(inputs, statuses) {
     if (form) {
         form.addEventListener('submit', addOutput);
     }
+}
+
+// Обновление списка входов в форме (без сброса значений)
+function updateOutputFormInputs(inputs) {
+    const select = document.getElementById('output-input');
+    if (!select) return;
+
+    const currentValue = select.value;
+
+    // Обновляем опции
+    select.innerHTML = inputs.map(input =>
+        `<option value="${input.Name || input.name}" ${(input.Name || input.name) === currentValue ? 'selected' : ''}>${input.Name || input.name}</option>`
+    ).join('');
+}
+
+// Отображение статусов выходов (обновляемая часть)
+function displayOutputsStatus(statuses) {
+    const container = document.getElementById('outputs-status-container');
+    const currentTime = new Date().toLocaleTimeString();
+
+    const html = `
+        <div class="form-group">
+            <h3>${t('outputs.management')} <small style="color: #6c757d;">(${t('common.updated')}: ${currentTime})</small></h3>
+            ${statuses.length === 0 ? `<p>${t('outputs.noActiveInputs')}</p>` : statuses.map(input => `
+                <div class="status-card">
+                    <h3>
+                        <span class="status-indicator ${input.active ? 'status-active' : 'status-inactive'}"></span>
+                        ${input.name}
+                    </h3>
+                    ${input.outputs && input.outputs.length > 0 ? input.outputs.map(output => `
+                        <div class="output-item">
+                            <div class="output-info">
+                                <div class="output-url">${output.url}</div>
+                                <div class="output-stats">
+                                    ${t('common.status')}: <span style="color: ${output.active ? '#27ae60' : '#e74c3c'}; font-weight: bold;">${output.active ? t('common.active') : t('common.inactive')}</span> | 
+                                    ${t('common.bitrate')}: <strong>${(output.bitrate_kbps || 0).toFixed(1)} kbps</strong> | 
+                                    ${t('common.uptime')}: <strong>${output.uptime || '00:00:00'}</strong> | 
+                                    ${t('common.errors')}: <strong>${output.error_count || 0}</strong>
+                                </div>
+                            </div>
+                            <div class="output-actions">
+                                <button class="btn btn-warning btn-small" onclick="reconnectOutput('${input.name}', '${output.url}')" title="${t('common.reconnect')}">
+                                    🔄
+                                </button>
+                                <button class="btn btn-danger btn-small" onclick="removeOutput('${input.name}', '${output.url}')" title="${t('common.remove')}">
+                                    🗑️
+                                </button>
+                            </div>
+                        </div>
+                    `).join('') : `<p>${t('status.noOutputs')}</p>`}
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    container.innerHTML = html;
 }
 
 // Добавление выхода
@@ -375,16 +656,21 @@ async function addOutput(event) {
             })
         });
 
-        showSuccess('Выход успешно добавлен');
+        showSuccess(t('outputs.addSuccess'));
+
+        // Очищаем только поле URL
+        document.getElementById('output-url').value = '';
+
+        // Обновляем только статусы выходов, не трогаем форму
         loadOutputs();
     } catch (error) {
-        showError('Ошибка добавления выхода: ' + error.message);
+        showError(t('outputs.addError') + ': ' + error.message);
     }
 }
 
 // Удаление выхода
 async function removeOutput(inputName, url) {
-    if (!confirm(`Удалить выход "${url}"?`)) return;
+    if (!confirm(`${t('outputs.removeConfirm')} "${url}"?`)) return;
 
     try {
         await apiRequest('/outputs/remove', {
@@ -395,10 +681,12 @@ async function removeOutput(inputName, url) {
             })
         });
 
-        showSuccess('Выход успешно удален');
+        showSuccess(t('outputs.removeSuccess'));
+
+        // Обновляем только статусы выходов, не трогаем форму
         loadOutputs();
     } catch (error) {
-        showError('Ошибка удаления выхода: ' + error.message);
+        showError(t('outputs.removeError') + ': ' + error.message);
     }
 }
 
@@ -413,10 +701,12 @@ async function reconnectOutput(inputName, url) {
             })
         });
 
-        showSuccess('Реконнект инициирован');
+        showSuccess(t('outputs.reconnectInitiated'));
+
+        // Обновляем только статусы выходов через короткое время
         setTimeout(() => loadOutputs(), 1000);
     } catch (error) {
-        showError('Ошибка реконнекта: ' + error.message);
+        showError(t('outputs.reconnectError') + ': ' + error.message);
     }
 }
 
@@ -426,7 +716,7 @@ async function loadSettings() {
         const settings = await apiRequest('/settings');
         displaySettings(settings);
     } catch (error) {
-        showError('Ошибка загрузки настроек: ' + error.message);
+        showError(t('settings.loadError') + ': ' + error.message);
     }
 }
 
@@ -437,56 +727,56 @@ function displaySettings(settings) {
     const html = `
         <form id="settings-form">
             <div class="form-group">
-                <h3>Настройки SRT</h3>
+                <h3>${t('settings.srt')}</h3>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Latency (мс):</label>
+                        <label>${t('settings.latency')}</label>
                         <input type="number" class="form-control" id="srt-latency" value="${settings.SRTSettings?.Latency || settings.srt_settings?.latency || 120}" min="0">
                     </div>
                     <div class="form-group">
-                        <label>Connect Timeout (мс):</label>
+                        <label>${t('settings.timeout')}</label>
                         <input type="number" class="form-control" id="srt-timeout" value="${settings.SRTSettings?.ConnectTimeout || settings.srt_settings?.connect_timeout || 5000}" min="0">
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Passphrase:</label>
+                        <label>${t('settings.passphrase')}</label>
                         <input type="text" class="form-control" id="srt-passphrase" value="${settings.SRTSettings?.Passphrase || settings.srt_settings?.passphrase || ''}">
                     </div>
                     <div class="form-group">
-                        <label>Stream ID:</label>
+                        <label>${t('settings.streamId')}</label>
                         <input type="text" class="form-control" id="srt-streamid" value="${settings.SRTSettings?.StreamID || settings.srt_settings?.streamid || ''}">
                     </div>
                 </div>
             </div>
             
             <div class="form-group">
-                <h3>Настройки логирования</h3>
+                <h3>${t('settings.logging')}</h3>
                 <div class="form-row">
                     <div class="form-group">
                         <label>
                             <input type="checkbox" id="log-to-file" ${settings.LogToFile || settings.log_to_file ? 'checked' : ''}>
-                            Логировать в файл
+                            ${t('settings.logToFile')}
                         </label>
                     </div>
                     <div class="form-group">
-                        <label>Файл лога:</label>
+                        <label>${t('settings.logFile')}</label>
                         <input type="text" class="form-control" id="log-file" value="${settings.LogFile || settings.log_file || 'server.log'}">
                     </div>
                 </div>
             </div>
             
             <div class="form-group">
-                <h3>Интервал переподключения</h3>
+                <h3>${t('settings.reconnectInterval')}</h3>
                 <div class="form-group">
-                    <label>Интервал (секунды):</label>
+                    <label>${t('settings.reconnectIntervalLabel')}</label>
                     <input type="number" class="form-control" id="reconnect-interval" value="${settings.ReconnectInterval || settings.reconnect_interval || 5}" min="1">
                 </div>
             </div>
             
             <div class="form-group">
-                <button type="submit" class="btn btn-success">Сохранить настройки</button>
-                <button type="button" class="btn btn-warning" onclick="reloadSettings()">Перезагрузить из файла</button>
+                <button type="submit" class="btn btn-success">${t('common.save')}</button>
+                <button type="button" class="btn btn-warning" onclick="reloadSettings()">${t('settings.reload')}</button>
             </div>
         </form>
     `;
@@ -520,9 +810,9 @@ async function saveSettings(event) {
             body: JSON.stringify(settings)
         });
 
-        showSuccess('Настройки успешно сохранены');
+        showSuccess(t('settings.saveSuccess'));
     } catch (error) {
-        showError('Ошибка сохранения настроек: ' + error.message);
+        showError(t('settings.saveError') + ': ' + error.message);
     }
 }
 
@@ -530,10 +820,10 @@ async function saveSettings(event) {
 async function reloadSettings() {
     try {
         await apiRequest('/settings/reload', { method: 'POST' });
-        showSuccess('Настройки перезагружены из файла');
+        showSuccess(t('settings.reloadSuccess'));
         loadSettings();
     } catch (error) {
-        showError('Ошибка перезагрузки настроек: ' + error.message);
+        showError(t('settings.reloadError') + ': ' + error.message);
     }
 }
 

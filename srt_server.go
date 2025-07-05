@@ -154,32 +154,73 @@ func (s *SRTServer) handleConnection(conn srt.Conn) {
 	outputChannels := make(map[string]chan []byte)
 	stopChannels := make(map[string]chan struct{})
 
-	for _, outputURL := range srtOutputs {
+	// Функция для создания выхода
+	createOutput := func(outputURL string) {
+		if _, exists := outputChannels[outputURL]; exists {
+			return // Выход уже создан
+		}
+
 		ch := make(chan []byte, 1000)
+		if strings.HasPrefix(outputURL, "rtmp://") {
+			ch = make(chan []byte, 5000)
+		}
 		stop := make(chan struct{})
 		outputChannels[outputURL] = ch
 		stopChannels[outputURL] = stop
+
 		s.wg.Add(1)
-		go s.handleSRTOutput(inputName, outputURL, ch, stop)
-	}
-	for _, outputURL := range rtmpOutputs {
-		ch := make(chan []byte, 5000)
-		stop := make(chan struct{})
-		outputChannels[outputURL] = ch
-		stopChannels[outputURL] = stop
-		s.wg.Add(1)
-		go s.handleRTMPOutput(inputName, outputURL, ch, stop)
+		if strings.HasPrefix(outputURL, "srt://") {
+			go s.handleSRTOutput(inputName, outputURL, ch, stop)
+		} else if strings.HasPrefix(outputURL, "rtmp://") {
+			go s.handleRTMPOutput(inputName, outputURL, ch, stop)
+		} else if strings.HasPrefix(outputURL, "file://") {
+			go s.handleFileOutput(inputName, outputURL, ch, stop)
+		}
 	}
 
-	// Добавляем обработку file:// выходов
-	for _, outputURL := range fileOutputs {
-		ch := make(chan []byte, 1000)
-		stop := make(chan struct{})
-		outputChannels[outputURL] = ch
-		stopChannels[outputURL] = stop
-		s.wg.Add(1)
-		go s.handleFileOutput(inputName, outputURL, ch, stop)
+	// Создаем начальные выходы
+	for _, outputURL := range srtOutputs {
+		createOutput(outputURL)
 	}
+	for _, outputURL := range rtmpOutputs {
+		createOutput(outputURL)
+	}
+	for _, outputURL := range fileOutputs {
+		createOutput(outputURL)
+	}
+
+	// Горутина для динамического обновления выходов
+	updateTicker := time.NewTicker(2 * time.Second)
+	defer updateTicker.Stop()
+
+	stopUpdateChan := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-stopUpdateChan:
+				return
+			case <-updateTicker.C:
+				// Получаем актуальный список выходов
+				currentOutputs := make(map[string]struct{})
+				for _, url := range inputCfg.Outputs {
+					if strings.HasPrefix(url, "srt://") || strings.HasPrefix(url, "rtmp://") || strings.HasPrefix(url, "file://") {
+						currentOutputs[url] = struct{}{}
+						s.manager.RegisterOutput(inputName, url)
+						createOutput(url)
+					}
+				}
+
+				// Удаляем неактуальные выходы
+				for url, stopCh := range stopChannels {
+					if _, exists := currentOutputs[url]; !exists {
+						close(stopCh)
+						delete(outputChannels, url)
+						delete(stopChannels, url)
+					}
+				}
+			}
+		}
+	}()
 
 	// Читаем данные из входящего SRT соединения и отправляем во все выходы
 	buffer := make([]byte, 1316)
@@ -192,6 +233,7 @@ func (s *SRTServer) handleConnection(conn srt.Conn) {
 		select {
 		case <-s.ctx.Done():
 			log.Printf("[SRT] Context cancelled, stopping connection")
+			close(stopUpdateChan)
 			return
 		default:
 		}
@@ -239,6 +281,7 @@ func (s *SRTServer) handleConnection(conn srt.Conn) {
 		}
 	}
 
+	close(stopUpdateChan)
 	for _, stop := range stopChannels {
 		close(stop)
 	}
