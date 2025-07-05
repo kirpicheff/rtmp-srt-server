@@ -143,6 +143,12 @@ func (s *SRTServer) handleConnection(conn srt.Conn) {
 			s.manager.RegisterOutput(inputName, outputURL)
 		}
 	}
+	if len(fileOutputs) > 0 {
+		log.Printf("[SRT] Found %d file outputs for %s", len(fileOutputs), inputName)
+		for _, outputURL := range fileOutputs {
+			s.manager.RegisterOutput(inputName, outputURL)
+		}
+	}
 
 	// Создаем каналы для каждого выхода
 	outputChannels := make(map[string]chan []byte)
@@ -588,26 +594,35 @@ func (s *SRTServer) handleFileOutput(inputName, outputURL string, dataCh <-chan 
 	file, err := os.Create(filePath)
 	if err != nil {
 		log.Printf("[SRT] Failed to create file %s: %v", filePath, err)
+		s.manager.SetOutputActive(inputName, outputURL, false)
 		return
 	}
 	defer file.Close()
 
 	log.Printf("[SRT] Writing to file: %s", filePath)
+	s.manager.SetOutputActive(inputName, outputURL, true)
+
+	var totalBytes int64
 
 	for {
 		select {
 		case <-stopCh:
 			log.Printf("[SRT] File output stopped: %s", filePath)
+			s.manager.SetOutputActive(inputName, outputURL, false)
 			return
 		case data, ok := <-dataCh:
 			if !ok {
+				s.manager.SetOutputActive(inputName, outputURL, false)
 				return
 			}
 			_, err := file.Write(data)
 			if err != nil {
 				log.Printf("[SRT] Write error to file %s: %v", filePath, err)
+				s.manager.SetOutputActive(inputName, outputURL, false)
 				return
 			}
+			totalBytes += int64(len(data))
+			s.manager.UpdateOutputBitrate(inputName, outputURL, totalBytes)
 		}
 	}
 }
