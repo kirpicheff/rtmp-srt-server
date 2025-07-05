@@ -79,6 +79,9 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 		}
 		log.Printf("Matched input config: %s with %d outputs", inputCfg.Name, len(inputCfg.Outputs))
 
+		log.Printf("[DEBUG] Starting publish handling for input: %s", inputCfg.Name)
+		log.Printf("[DEBUG] Output URLs: %v", inputCfg.Outputs)
+
 		sm.SetStatusActive(inputCfg.Name, true)
 		defer sm.SetStatusActive(inputCfg.Name, false)
 
@@ -104,31 +107,33 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 					default:
 					}
 
-					log.Printf("Trying to connect to %s", url)
+					log.Printf("[DEBUG] Attempting to connect to output URL: %s", url)
 
 					if strings.HasPrefix(url, "file://") {
+						log.Printf("[DEBUG] Detected file output for URL: %s", url)
 						filename := strings.TrimPrefix(url, "file://")
+						log.Printf("[DEBUG] Creating file: %s", filename)
 						file, err := os.Create(filename)
 						if err != nil {
-							log.Printf("Failed to create file %s: %v", filename, err)
+							log.Printf("[ERROR] Failed to create file %s: %v", filename, err)
 							time.Sleep(5 * time.Second)
-							continue // Повторная попытка
+							return
 						}
 
+						log.Printf("[DEBUG] Writing FLV to file: %s", filename)
 						sm.SetOutputActive(inputCfg.Name, url, true)
-						log.Printf("Writing FLV to file: %s", filename)
-
 						muxer := flv.NewMuxer(file)
 						err = muxer.WriteHeader(streams)
 						if err != nil {
-							log.Printf("Failed to write FLV header to file %s: %v", filename, err)
+							log.Printf("[ERROR] Failed to write FLV header to file %s: %v", filename, err)
 							file.Close()
 							sm.SetOutputActive(inputCfg.Name, url, false)
 							time.Sleep(5 * time.Second)
-							continue
+							return
 						}
 
-						for {
+						fileDone := false
+						for !fileDone {
 							select {
 							case <-stop:
 								if err := muxer.WriteTrailer(); err != nil {
@@ -137,7 +142,7 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 								file.Close()
 								sm.SetOutputActive(inputCfg.Name, url, false)
 								log.Printf("File output stopped: %s", filename)
-								return
+								fileDone = true
 							case pkt, ok := <-ch:
 								if !ok {
 									if err := muxer.WriteTrailer(); err != nil {
@@ -145,7 +150,8 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 									}
 									file.Close()
 									sm.SetOutputActive(inputCfg.Name, url, false)
-									return
+									fileDone = true
+									break
 								}
 								err = muxer.WritePacket(pkt)
 								if err != nil {
@@ -156,12 +162,14 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 									file.Close()
 									sm.SetOutputActive(inputCfg.Name, url, false)
 									time.Sleep(5 * time.Second)
-									break // Выход из внутреннего цикла для переподключения
+									fileDone = true
+									break
 								}
 								totalBytes += int64(len(pkt.Data))
 								sm.UpdateOutputBitrate(inputCfg.Name, url, totalBytes)
 							}
 						}
+						return
 					} else if strings.HasPrefix(url, "rtmp://") {
 						dstConn, err := rtmp.Dial(url)
 						if err != nil {
@@ -350,6 +358,10 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 		// Сбрасываем статус всех выходов при завершении трансляции
 		for _, url := range inputCfg.Outputs {
 			sm.SetOutputActive(inputCfg.Name, url, false)
+		}
+		// ЯВНО закрываем все выходные каналы, чтобы завершились все горутины записи
+		for _, w := range outputMgr.AllOutputs() {
+			close(w.ch)
 		}
 	}
 }
