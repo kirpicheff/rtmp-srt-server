@@ -293,27 +293,30 @@ The server automatically detects video/audio PIDs by content, even if the incomi
 
 **Схема работы:**
 
+### WHIP Flow Diagram
+
 ```mermaid
 flowchart LR
-    subgraph Input ["Вход"]
-        A["WHIP клиент (WebRTC)"]
+    subgraph Input
+        A[WHIP Client<br/>WebRTC]
     end
-    subgraph Server ["Сервер"]
-        B["WHIP endpoint /whip/{name}"]
-        C["ffmpeg (SDP -> FLV)"]
-        D["StreamManager"]
+    subgraph Server
+        B[WHIP Endpoint<br/>/whip/name]
+        C[ffmpeg<br/>SDP to FLV]
+        D[StreamManager]
     end
-    subgraph Outputs ["Выходы"]
-        E["RTMP"]
-        F["SRT"]
-        G["File (FLV)"]
+    subgraph Outputs
+        E[RTMP]
+        F[SRT]
+        G[File FLV]
     end
-    A -->|"SDP/медиа"| B
-    B -->|"SDP"| C
-    C -->|"FLV packets"| D
-    D -->|"потоки"| E
-    D -->|"потоки"| F
-    D -->|"потоки"| G
+    
+    A -->|SDP/Media| B
+    B -->|SDP| C
+    C -->|FLV Packets| D
+    D --> E
+    D --> F
+    D --> G
 ```
 
 ### Требования к ffmpeg
