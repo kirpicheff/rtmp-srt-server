@@ -12,10 +12,10 @@ import (
 
 	"github.com/asticode/go-astits"
 	srt "github.com/datarhei/gosrt"
-	"github.com/nareix/joy4/av"
-	"github.com/nareix/joy4/codec/aacparser"
-	"github.com/nareix/joy4/codec/h264parser"
-	"github.com/nareix/joy4/format/rtmp"
+	"github.com/datarhei/joy4/av"
+	"github.com/datarhei/joy4/codec/aacparser"
+	"github.com/datarhei/joy4/codec/h264parser"
+	"github.com/datarhei/joy4/format/rtmp"
 )
 
 type SRTServer struct {
@@ -386,7 +386,7 @@ func (s *SRTServer) handleRTMPOutput(inputName, outputURL string, dataCh <-chan 
 		default:
 		}
 
-		dstConn, err := rtmp.Dial(outputURL)
+		dstConn, err := rtmp.Dial(outputURL, rtmp.DialOptions{})
 		if err != nil {
 			log.Printf("[SRT] RTMP Dial error for %s: %v", outputURL, err)
 			s.manager.SetOutputActive(inputName, outputURL, false)

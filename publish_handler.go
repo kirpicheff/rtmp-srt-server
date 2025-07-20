@@ -9,10 +9,10 @@ import (
 	"time"
 
 	srt "github.com/datarhei/gosrt"
-	"github.com/nareix/joy4/av"
-	"github.com/nareix/joy4/format/flv"
-	"github.com/nareix/joy4/format/rtmp"
-	"github.com/nareix/joy4/format/ts"
+	"github.com/datarhei/joy4/av"
+	"github.com/datarhei/joy4/format/flv"
+	"github.com/datarhei/joy4/format/rtmp"
+	"github.com/datarhei/joy4/format/ts"
 )
 
 // OutputManager управляет выходами для одного входа
@@ -171,7 +171,7 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 						}
 						return
 					} else if strings.HasPrefix(url, "rtmp://") {
-						dstConn, err := rtmp.Dial(url)
+						dstConn, err := rtmp.Dial(url, rtmp.DialOptions{})
 						if err != nil {
 							log.Printf("Failed to connect to %s: %v", url, err)
 							// Получаем актуальный интервал переподключения
@@ -255,6 +255,7 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 							continue
 						}
 						sm.SetOutputActive(inputCfg.Name, url, true)
+						// Используем буферизованный подход для стабильности
 						var tsBuf bytes.Buffer
 						muxer := ts.NewMuxer(&tsBuf)
 						err = muxer.WriteHeader(streams)
@@ -265,6 +266,22 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 							time.Sleep(time.Duration(reconnectInterval) * time.Second)
 							continue
 						}
+
+						// Отправляем заголовок TS сразу
+						headerData := tsBuf.Bytes()
+						if len(headerData) > 0 {
+							_, err = conn.Write(headerData)
+							if err != nil {
+								log.Printf("SRT Write header error for %s: %v", url, err)
+								conn.Close()
+								sm.SetOutputActive(inputCfg.Name, url, false)
+								time.Sleep(time.Duration(reconnectInterval) * time.Second)
+								continue
+							}
+							totalBytes += int64(len(headerData))
+							tsBuf.Reset()
+						}
+
 						for {
 							select {
 							case <-stop:
@@ -277,7 +294,8 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 									sm.SetOutputActive(inputCfg.Name, url, false)
 									return
 								}
-								tsBuf.Reset()
+
+								// Записываем пакет в TS муксер
 								err = muxer.WritePacket(pkt)
 								if err != nil {
 									log.Printf("TS WritePacket error for %s: %v", url, err)
@@ -286,8 +304,11 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 									time.Sleep(time.Duration(reconnectInterval) * time.Second)
 									break
 								}
-								if tsBuf.Len() > 0 {
-									_, err = conn.Write(tsBuf.Bytes())
+
+								// Отправляем все данные из буфера
+								tsData := tsBuf.Bytes()
+								if len(tsData) > 0 {
+									_, err = conn.Write(tsData)
 									if err != nil {
 										log.Printf("SRT Write error for %s: %v", url, err)
 										conn.Close()
@@ -295,8 +316,16 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 										time.Sleep(time.Duration(reconnectInterval) * time.Second)
 										break
 									}
-									totalBytes += int64(tsBuf.Len())
+									totalBytes += int64(len(tsData))
 									sm.UpdateOutputBitrate(inputCfg.Name, url, totalBytes)
+									tsBuf.Reset()
+
+									// Небольшая задержка для стабильности SRT
+									time.Sleep(1 * time.Millisecond)
+								} else {
+									// Если буфер пустой, отправляем пустой пакет для поддержания соединения
+									// Это предотвращает таймаут SRT
+									time.Sleep(10 * time.Millisecond)
 								}
 							}
 						}

@@ -18,10 +18,10 @@ import (
 	"time"
 
 	srt "github.com/datarhei/gosrt"
-	"github.com/nareix/joy4/av"
-	"github.com/nareix/joy4/format/flv"
-	"github.com/nareix/joy4/format/rtmp"
-	"github.com/nareix/joy4/format/ts"
+	"github.com/datarhei/joy4/av"
+	"github.com/datarhei/joy4/format/flv"
+	"github.com/datarhei/joy4/format/rtmp"
+	"github.com/datarhei/joy4/format/ts"
 	"github.com/pion/webrtc/v3"
 )
 
@@ -482,7 +482,7 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 					}
 				}
 			} else if strings.HasPrefix(url, "rtmp://") {
-				dstConn, err := rtmp.Dial(url)
+				dstConn, err := rtmp.Dial(url, rtmp.DialOptions{})
 				if err != nil {
 					log.Printf("[WHIP] Failed to connect to %s: %v", url, err)
 					w.manager.mu.RLock()
@@ -615,7 +615,8 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 							w.manager.SetOutputActive(inputName, url, false)
 							return
 						}
-						tsBuf.Reset()
+						// Сохраняем текущую позицию в буфере перед записью
+						bufferPosBefore := tsBuf.Len()
 						err = muxer.WritePacket(pkt)
 						if err != nil {
 							log.Printf("[WHIP] TS WritePacket error for %s: %v", url, err)
@@ -624,8 +625,10 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 							time.Sleep(time.Duration(reconnectInterval) * time.Second)
 							break
 						}
-						if tsBuf.Len() > 0 {
-							_, err = conn.Write(tsBuf.Bytes())
+						// Отправляем только новые данные, добавленные этим пакетом
+						if tsBuf.Len() > bufferPosBefore {
+							newData := tsBuf.Bytes()[bufferPosBefore:]
+							_, err = conn.Write(newData)
 							if err != nil {
 								log.Printf("[WHIP] SRT Write error for %s: %v", url, err)
 								conn.Close()
@@ -633,8 +636,13 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 								time.Sleep(time.Duration(reconnectInterval) * time.Second)
 								break
 							}
-							totalBytes += int64(tsBuf.Len())
+							totalBytes += int64(len(newData))
 							w.manager.UpdateOutputBitrate(inputName, url, totalBytes)
+
+							// Сбрасываем буфер если он стал слишком большим (более 1MB)
+							if tsBuf.Len() > 1024*1024 {
+								tsBuf.Reset()
+							}
 						}
 					}
 				}
