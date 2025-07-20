@@ -728,4 +728,62 @@ go project/
 > ├── bin/
 > │   └── ffmpeg.exe
 > └── ...
-> ``` 
+> ```
+
+## TS Muxer Fixes
+
+This project uses a custom fork of [datarhei/joy4](https://github.com/datarhei/joy4) with fixes for TS muxer issues that cause video freezing after ~5-6 minutes of streaming.
+
+### What was fixed:
+
+- ✅ **Individual continuity counters** - eliminates TS discontinuity errors
+- ✅ **Proper PCR timing** - prevents PCR timestamp wraparound issues  
+- ✅ **Periodic PAT/PMT sending** - maintains stream synchronization
+- ✅ **Simple timestamp conversion** - avoids complex 90kHz clock issues
+- ✅ **Buffer management improvements** - prevents stream corruption
+
+### How to build with fixes:
+
+#### Option 1: Use local fork (recommended for development)
+```bash
+# Clone the repository
+git clone https://github.com/kirpicheff/rtmp-srt-server.git
+cd rtmp-srt-server
+
+# The project already includes the fixed joy4 fork
+# Just build normally:
+go build -o rtmpserver.exe .
+```
+
+#### Option 2: Use GitHub fork (for production)
+```bash
+# Clone the repository
+git clone https://github.com/kirpicheff/rtmp-srt-server.git
+cd rtmp-srt-server
+
+# Edit go.mod to use the GitHub fork:
+# Replace this line:
+# replace github.com/datarhei/joy4 => ./joy4
+# With:
+# replace github.com/datarhei/joy4 => github.com/kirpicheff/joy4 v0.1.0-ts-fixes
+
+# Then build:
+go build -o rtmpserver.exe .
+```
+
+### Fork details:
+
+- **Repository:** [kirpicheff/joy4](https://github.com/kirpicheff/joy4)
+- **Branch:** `ts-muxer-fixes`
+- **Tag:** `v0.1.0-ts-fixes`
+- **Commit:** `cc69ce4b46da` - "Fix TS muxer: individual continuity counters, proper PCR timing, periodic PAT/PMT"
+
+### Original issue:
+
+The original datarhei/joy4 TS muxer had issues with:
+- Video freezing after ~5-6 minutes of streaming
+- TS discontinuity errors in VLC
+- PCR timestamp wraparound problems
+- Buffer management issues
+
+These fixes resolve all known TS muxing issues for stable long-term streaming. 
