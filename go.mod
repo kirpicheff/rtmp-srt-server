@@ -5,8 +5,7 @@ go 1.24.4
 require (
 	github.com/asticode/go-astits v1.13.0
 	github.com/datarhei/gosrt v0.9.0
-	github.com/nareix/joy4 v0.0.0-20200507095837-05a4ffbb5369
-	github.com/pion/rtp v1.8.20
+	github.com/datarhei/joy4 v0.0.0-20250229143024-b140734
 	github.com/pion/webrtc/v3 v3.3.5
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -16,7 +15,6 @@ require (
 	github.com/benburkert/openpgp v0.0.0-20160410205803-c2471f86866c // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/uuid v1.3.1 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/pion/datachannel v1.5.8 // indirect
 	github.com/pion/dtls/v2 v2.2.12 // indirect
 	github.com/pion/ice/v2 v2.3.36 // indirect
@@ -25,6 +23,7 @@ require (
 	github.com/pion/mdns v0.0.12 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
 	github.com/pion/rtcp v1.2.14 // indirect
+	github.com/pion/rtp v1.8.20 // indirect
 	github.com/pion/sctp v1.8.19 // indirect
 	github.com/pion/sdp/v3 v3.0.9 // indirect
 	github.com/pion/srtp/v2 v2.0.20 // indirect
@@ -38,3 +37,5 @@ require (
 	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 )
+
+replace github.com/datarhei/joy4 => ./joy4
