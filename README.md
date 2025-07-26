@@ -276,6 +276,12 @@ go project/
 - Check your network stability and CDN health.
 - If you see "RTMP Output buffer full" in logs, increase the output buffer size in the code.
 
+### SRT timestamp conversion errors в VLC
+- Исправлено в версии 1.2+: добавлена нормализация временных меток для SRT выходов
+- Если видите ошибки типа "Could not convert timestamp 1198778360812 for faad" - обновите сервер
+- Нормализация временных меток происходит относительно первого ключевого кадра
+- Проверьте логи на наличие "SRT base time set to: [время]" для подтверждения работы
+
 ## Universal Fallback for RTMP from SRT
 
 The server automatically detects video/audio PIDs by content, even if the incoming SRT/TS stream is missing PMT/PAT tables or uses non-standard PIDs. This ensures maximum compatibility with streams from OBS, ffmpeg, hardware encoders, and other sources.
@@ -645,6 +651,12 @@ go project/
 ### RTMP-выход часто обрывается или переподключается
 - Проверьте стабильность сети и работу CDN.
 - Если в логах есть "RTMP Output buffer full" — увеличьте размер буфера в коде.
+
+### SRT timestamp conversion errors в VLC
+- Исправлено в версии 1.2+: добавлена нормализация временных меток для SRT выходов
+- Если видите ошибки типа "Could not convert timestamp 1198778360812 for faad" - обновите сервер
+- Нормализация временных меток происходит относительно первого ключевого кадра
+- Проверьте логи на наличие "SRT base time set to: [время]" для подтверждения работы
 
 ## Универсальный fallback для RTMP из SRT
 

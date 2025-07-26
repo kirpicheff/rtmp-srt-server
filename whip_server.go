@@ -567,6 +567,13 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 					continue
 				}
 				w.manager.SetOutputActive(inputName, url, true)
+
+				// Правильная обработка временных меток для SRT
+				var baseTime time.Duration
+				var baseTimeSet bool
+				var lastVideoTime time.Duration
+				var lastAudioTime time.Duration
+
 				var tsBuf bytes.Buffer
 				muxer := ts.NewMuxer(&tsBuf)
 
@@ -615,9 +622,52 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 							w.manager.SetOutputActive(inputName, url, false)
 							return
 						}
+
+						// Обработка временных меток для SRT
+						if !baseTimeSet {
+							// Ждем первый ключевой кадр для установки базового времени
+							if pkt.IsKeyFrame {
+								baseTime = pkt.Time
+								baseTimeSet = true
+								log.Printf("[WHIP] SRT base time set to: %v", baseTime)
+							} else {
+								// Пропускаем пакеты до первого ключевого кадра
+								continue
+							}
+						}
+
+						// Нормализуем временную метку относительно базового времени
+						normalizedTime := pkt.Time - baseTime
+						if normalizedTime < 0 {
+							normalizedTime = 0
+						}
+
+						// Создаем новый пакет с нормализованной временной меткой
+						normalizedPkt := av.Packet{
+							Data:       pkt.Data,
+							Time:       normalizedTime,
+							Idx:        pkt.Idx,
+							IsKeyFrame: pkt.IsKeyFrame,
+						}
+
+						// Проверяем монотонность временных меток
+						if pkt.Idx == 0 { // Video
+							if normalizedTime < lastVideoTime {
+								normalizedTime = lastVideoTime
+								normalizedPkt.Time = normalizedTime
+							}
+							lastVideoTime = normalizedTime
+						} else { // Audio
+							if normalizedTime < lastAudioTime {
+								normalizedTime = lastAudioTime
+								normalizedPkt.Time = normalizedTime
+							}
+							lastAudioTime = normalizedTime
+						}
+
 						// Сохраняем текущую позицию в буфере перед записью
 						bufferPosBefore := tsBuf.Len()
-						err = muxer.WritePacket(pkt)
+						err = muxer.WritePacket(normalizedPkt)
 						if err != nil {
 							log.Printf("[WHIP] TS WritePacket error for %s: %v", url, err)
 							conn.Close()

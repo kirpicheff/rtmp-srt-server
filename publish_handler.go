@@ -93,7 +93,7 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 
 		stopChan := make(chan struct{})
 		outputMgr := NewOutputManager()
-		bufSize := 500
+		bufSize := 2000
 
 		// Функция для старта push-горутины для выхода
 		startPush := func(url string) func(<-chan av.Packet, <-chan struct{}) {
@@ -255,6 +255,13 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 							continue
 						}
 						sm.SetOutputActive(inputCfg.Name, url, true)
+
+						// Правильная обработка временных меток для SRT
+						var baseTime time.Duration
+						var baseTimeSet bool
+						var lastVideoTime time.Duration
+						var lastAudioTime time.Duration
+
 						// Используем буферизованный подход для стабильности
 						var tsBuf bytes.Buffer
 						muxer := ts.NewMuxer(&tsBuf)
@@ -295,8 +302,50 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 									return
 								}
 
+								// Обработка временных меток для SRT
+								if !baseTimeSet {
+									// Ждем первый ключевой кадр для установки базового времени
+									if pkt.IsKeyFrame {
+										baseTime = pkt.Time
+										baseTimeSet = true
+										log.Printf("SRT base time set to: %v", baseTime)
+									} else {
+										// Пропускаем пакеты до первого ключевого кадра
+										continue
+									}
+								}
+
+								// Нормализуем временную метку относительно базового времени
+								normalizedTime := pkt.Time - baseTime
+								if normalizedTime < 0 {
+									normalizedTime = 0
+								}
+
+								// Создаем новый пакет с нормализованной временной меткой
+								normalizedPkt := av.Packet{
+									Data:       pkt.Data,
+									Time:       normalizedTime,
+									Idx:        pkt.Idx,
+									IsKeyFrame: pkt.IsKeyFrame,
+								}
+
+								// Проверяем монотонность временных меток
+								if pkt.Idx == 0 { // Video
+									if normalizedTime < lastVideoTime {
+										normalizedTime = lastVideoTime
+										normalizedPkt.Time = normalizedTime
+									}
+									lastVideoTime = normalizedTime
+								} else { // Audio
+									if normalizedTime < lastAudioTime {
+										normalizedTime = lastAudioTime
+										normalizedPkt.Time = normalizedTime
+									}
+									lastAudioTime = normalizedTime
+								}
+
 								// Записываем пакет в TS муксер
-								err = muxer.WritePacket(pkt)
+								err = muxer.WritePacket(normalizedPkt)
 								if err != nil {
 									log.Printf("TS WritePacket error for %s: %v", url, err)
 									conn.Close()
