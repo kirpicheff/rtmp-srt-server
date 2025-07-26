@@ -469,3 +469,32 @@ func (sm *StreamManager) RemoveStream(name string) {
 		}
 	}
 }
+
+// GetActiveInputs возвращает список активных входов
+func (sm *StreamManager) GetActiveInputs() []*StreamStatus {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+
+	var activeInputs []*StreamStatus
+	for _, status := range sm.status {
+		if status.Active {
+			activeInputs = append(activeInputs, status)
+		}
+	}
+	return activeInputs
+}
+
+// GetOutputsForInput возвращает все выходы для указанного входа
+func (sm *StreamManager) GetOutputsForInput(inputName string) []*OutputStatus {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+
+	if outputs, exists := sm.outputs[inputName]; exists {
+		var result []*OutputStatus
+		for _, output := range outputs {
+			result = append(result, output)
+		}
+		return result
+	}
+	return []*OutputStatus{}
+}

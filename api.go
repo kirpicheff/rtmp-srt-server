@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -56,6 +57,9 @@ func (api *APIServer) routes() http.Handler {
 	// Статические файлы веб-интерфейса
 	mux.HandleFunc("/", api.handleWebInterface)
 
+	// Health check endpoint (без аутентификации)
+	mux.HandleFunc("/health", api.handleHealthCheck)
+
 	// API маршруты
 	mux.HandleFunc("/api/inputs", api.basicAuth(api.handleListInputs))                      // GET
 	mux.HandleFunc("/api/inputs/add", api.basicAuth(api.handleAddInput))                    // POST
@@ -73,6 +77,55 @@ func (api *APIServer) routes() http.Handler {
 }
 
 // --- Handlers ---
+
+// Health check endpoint для мониторинга
+func (api *APIServer) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Получаем статус всех входов
+	allStatuses := api.SM.GetAllStatuses()
+
+	// Подсчитываем статистику
+	var totalInputs, activeInputs, totalOutputs, activeOutputs int
+	for _, status := range allStatuses {
+		totalInputs++
+		if status.Active {
+			activeInputs++
+		}
+		for _, output := range status.Outputs {
+			totalOutputs++
+			if output.Active {
+				activeOutputs++
+			}
+		}
+	}
+
+	// Формируем ответ
+	healthStatus := map[string]interface{}{
+		"status":    "ok",
+		"timestamp": time.Now().Format(time.RFC3339),
+		"inputs": map[string]interface{}{
+			"total":  totalInputs,
+			"active": activeInputs,
+		},
+		"outputs": map[string]interface{}{
+			"total":  totalOutputs,
+			"active": activeOutputs,
+		},
+	}
+
+	// Если нет активных входов, считаем сервер "нездоровым"
+	if activeInputs == 0 {
+		healthStatus["status"] = "warning"
+		healthStatus["message"] = "No active inputs"
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(healthStatus)
+}
 
 func (api *APIServer) handleListInputs(w http.ResponseWriter, r *http.Request) {
 	inputs := api.SM.ListInputs()

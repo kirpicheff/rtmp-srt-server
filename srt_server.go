@@ -66,6 +66,28 @@ func (s *SRTServer) Start() error {
 		},
 	}
 
+	// Heartbeat для отслеживания состояния SRT сервера
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+
+		startTime := time.Now()
+		log.Printf("[HEARTBEAT] SRT server started at %v", startTime)
+
+		for {
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-ticker.C:
+				uptime := time.Since(startTime)
+				s.mu.RLock()
+				connectionCount := len(s.connections)
+				s.mu.RUnlock()
+				log.Printf("[HEARTBEAT] SRT server uptime: %v, Active connections: %d", uptime, connectionCount)
+			}
+		}
+	}()
+
 	// Запускаем сервер
 	go func() {
 		if err := s.server.ListenAndServe(); err != nil {

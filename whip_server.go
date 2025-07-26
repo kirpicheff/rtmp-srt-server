@@ -68,6 +68,26 @@ func (w *WHIPServer) Start() error {
 		Handler: mux,
 	}
 
+	// Heartbeat для отслеживания состояния WHIP сервера
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+
+		startTime := time.Now()
+		log.Printf("[HEARTBEAT] WHIP server started at %v", startTime)
+
+		for {
+			select {
+			case <-time.After(5 * time.Minute):
+				uptime := time.Since(startTime)
+				w.sessionMu.RLock()
+				sessionCount := len(w.sessions)
+				w.sessionMu.RUnlock()
+				log.Printf("[HEARTBEAT] WHIP server uptime: %v, Active sessions: %d", uptime, sessionCount)
+			}
+		}
+	}()
+
 	w.wg.Add(1)
 	go func() {
 		defer w.wg.Done()
@@ -573,6 +593,9 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 				var baseTimeSet bool
 				var lastVideoTime time.Duration
 				var lastAudioTime time.Duration
+				// Убираем ресинхронизацию - она ломает кодировщик
+				// const resyncInterval = 10 * time.Minute
+				// const maxNormalizedTime = 30 * time.Minute
 
 				var tsBuf bytes.Buffer
 				muxer := ts.NewMuxer(&tsBuf)
@@ -627,19 +650,29 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 						if !baseTimeSet {
 							// Ждем первый ключевой кадр для установки базового времени
 							if pkt.IsKeyFrame {
-								baseTime = pkt.Time
+								// Не устанавливаем baseTime если временная метка уже 0
+								if pkt.Time > 0 {
+									baseTime = pkt.Time
+									log.Printf("[WHIP] SRT base time set to: %v", baseTime)
+								} else {
+									log.Printf("[WHIP] SRT first keyframe has zero timestamp, skipping base time setup")
+								}
 								baseTimeSet = true
-								log.Printf("[WHIP] SRT base time set to: %v", baseTime)
 							} else {
 								// Пропускаем пакеты до первого ключевого кадра
 								continue
 							}
 						}
 
-						// Нормализуем временную метку относительно базового времени
+						// Простая нормализация без ресинхронизации
 						normalizedTime := pkt.Time - baseTime
 						if normalizedTime < 0 {
 							normalizedTime = 0
+						}
+
+						// Логируем детали нормализации для отладки
+						if pkt.IsKeyFrame {
+							log.Printf("[WHIP] Keyframe - Original: %v, Base: %v, Normalized: %v", pkt.Time, baseTime, normalizedTime)
 						}
 
 						// Создаем новый пакет с нормализованной временной меткой

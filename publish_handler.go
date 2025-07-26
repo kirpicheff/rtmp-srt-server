@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"log"
 	"os"
 	"strings"
@@ -69,6 +70,14 @@ func (om *OutputManager) AllOutputs() map[string]*outputWorker {
 
 func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 	return func(srcConn *rtmp.Conn) {
+		// Добавляем обработку паники
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[PANIC] Publish handler panic: %v", r)
+			}
+			log.Printf("[DEBUG] Publish handler finished for: %s", srcConn.URL)
+		}()
+
 		log.Printf("Publish started: %s", srcConn.URL)
 
 		inputCfg := sm.GetInputByPath(srcConn.URL.Path)
@@ -93,12 +102,60 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 
 		stopChan := make(chan struct{})
 		outputMgr := NewOutputManager()
-		bufSize := 2000
+		bufSize := 5000 // Увеличили с 3000 до 5000 для лучшей устойчивости
+
+		// Heartbeat для отслеживания состояния трансляции
+		heartbeatCtx, heartbeatCancel := context.WithCancel(context.Background())
+		defer heartbeatCancel()
+
+		go func() {
+			ticker := time.NewTicker(2 * time.Minute)
+			defer ticker.Stop()
+
+			startTime := time.Now()
+			log.Printf("[HEARTBEAT] Publish started for '%s' at %v", inputCfg.Name, startTime)
+
+			for {
+				select {
+				case <-heartbeatCtx.Done():
+					return
+				case <-ticker.C:
+					uptime := time.Since(startTime)
+					outputs := outputMgr.AllOutputs()
+					activeOutputs := 0
+					for range outputs {
+						activeOutputs++
+					}
+					log.Printf("[HEARTBEAT] Publish '%s' uptime: %v, Active outputs: %d/%d",
+						inputCfg.Name, uptime, activeOutputs, len(inputCfg.Outputs))
+
+					// Проверяем состояние соединений
+					for url, w := range outputs {
+						bufferSize := len(w.ch)
+						// Логируем только если буфер заполнен больше чем на 50%
+						if bufferSize > bufSize/2 {
+							log.Printf("[WARNING] Output %s buffer filling up: %d/%d", url, bufferSize, bufSize)
+						}
+					}
+				}
+			}
+		}()
 
 		// Функция для старта push-горутины для выхода
 		startPush := func(url string) func(<-chan av.Packet, <-chan struct{}) {
 			return func(ch <-chan av.Packet, stop <-chan struct{}) {
+				// Добавляем обработку паники для output горутин
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("[PANIC] Output goroutine panic for %s: %v", url, r)
+					}
+					log.Printf("[DEBUG] Output goroutine finished for: %s", url)
+				}()
+
 				var totalBytes int64
+				var packetCount int64
+				var lastLogTime time.Time
+
 				for {
 					select {
 					case <-stop:
@@ -107,7 +164,8 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 					default:
 					}
 
-					log.Printf("[DEBUG] Attempting to connect to output URL: %s", url)
+					// Убираем спам логи подключения
+					// log.Printf("[DEBUG] Attempting to connect to output URL: %s", url)
 
 					if strings.HasPrefix(url, "file://") {
 						log.Printf("[DEBUG] Detected file output for URL: %s", url)
@@ -254,6 +312,8 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 							time.Sleep(time.Duration(reconnectInterval) * time.Second)
 							continue
 						}
+
+						// Проверяем состояние соединения
 						sm.SetOutputActive(inputCfg.Name, url, true)
 
 						// Правильная обработка временных меток для SRT
@@ -261,6 +321,9 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 						var baseTimeSet bool
 						var lastVideoTime time.Duration
 						var lastAudioTime time.Duration
+						// Убираем ресинхронизацию - она ломает кодировщик
+						// const resyncInterval = 10 * time.Minute
+						// const maxNormalizedTime = 30 * time.Minute
 
 						// Используем буферизованный подход для стабильности
 						var tsBuf bytes.Buffer
@@ -306,20 +369,30 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 								if !baseTimeSet {
 									// Ждем первый ключевой кадр для установки базового времени
 									if pkt.IsKeyFrame {
-										baseTime = pkt.Time
+										// Не устанавливаем baseTime если временная метка уже 0
+										if pkt.Time > 0 {
+											baseTime = pkt.Time
+											log.Printf("SRT base time set to: %v", baseTime)
+										} else {
+											log.Printf("SRT first keyframe has zero timestamp, skipping base time setup")
+										}
 										baseTimeSet = true
-										log.Printf("SRT base time set to: %v", baseTime)
 									} else {
 										// Пропускаем пакеты до первого ключевого кадра
 										continue
 									}
 								}
 
-								// Нормализуем временную метку относительно базового времени
+								// Простая нормализация без ресинхронизации
 								normalizedTime := pkt.Time - baseTime
 								if normalizedTime < 0 {
 									normalizedTime = 0
 								}
+
+								// Логируем детали нормализации для отладки
+								//if pkt.IsKeyFrame {
+								//	log.Printf("[SRT] Keyframe - Original: %v, Base: %v, Normalized: %v", pkt.Time, baseTime, normalizedTime)
+								//}
 
 								// Создаем новый пакет с нормализованной временной меткой
 								normalizedPkt := av.Packet{
@@ -354,23 +427,69 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 									break
 								}
 
-								// Отправляем все данные из буфера
+								// Логируем обработку пакетов для диагностики блокировки
+								//if pkt.IsKeyFrame {
+								//	log.Printf("[DEBUG] Processing keyframe for %s", url)
+								//}
+
+								// Подсчитываем статистику
+								packetCount++
+								if time.Since(lastLogTime) > 30*time.Second {
+									log.Printf("[DEBUG] Output %s processed %d packets in 30s", url, packetCount)
+									packetCount = 0
+									lastLogTime = time.Now()
+								}
+
+								// Отправляем все данные из буфера с таймаутом
 								tsData := tsBuf.Bytes()
 								if len(tsData) > 0 {
-									_, err = conn.Write(tsData)
-									if err != nil {
-										log.Printf("SRT Write error for %s: %v", url, err)
+									// Неблокирующая запись с таймаутом
+									writeDone := make(chan error, 1)
+
+									go func() {
+										conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
+										_, err := conn.Write(tsData)
+										writeDone <- err
+									}()
+
+									// Ждем результат с таймаутом
+									select {
+									case err := <-writeDone:
+										if err != nil {
+											log.Printf("SRT Write error for %s: %v", url, err)
+
+											// Детальная диагностика ошибки
+											if strings.Contains(err.Error(), "timeout") {
+												log.Printf("[ERROR] SRT write timeout for %s - connection may be slow", url)
+											} else if strings.Contains(err.Error(), "connection") {
+												log.Printf("[ERROR] SRT connection lost for %s", url)
+											} else if strings.Contains(err.Error(), "broken") {
+												log.Printf("[ERROR] SRT pipe broken for %s", url)
+											} else {
+												log.Printf("[ERROR] SRT unknown error for %s: %T", url, err)
+											}
+
+											conn.Close()
+											sm.SetOutputActive(inputCfg.Name, url, false)
+											time.Sleep(time.Duration(reconnectInterval) * time.Second)
+											break
+										}
+
+										totalBytes += int64(len(tsData))
+										sm.UpdateOutputBitrate(inputCfg.Name, url, totalBytes)
+										tsBuf.Reset()
+
+										// Небольшая задержка для стабильности SRT
+										time.Sleep(1 * time.Millisecond)
+
+									case <-time.After(3 * time.Second):
+										// Таймаут записи - закрываем соединение
+										log.Printf("[ERROR] SRT write timeout for %s - forcing reconnect", url)
 										conn.Close()
 										sm.SetOutputActive(inputCfg.Name, url, false)
 										time.Sleep(time.Duration(reconnectInterval) * time.Second)
 										break
 									}
-									totalBytes += int64(len(tsData))
-									sm.UpdateOutputBitrate(inputCfg.Name, url, totalBytes)
-									tsBuf.Reset()
-
-									// Небольшая задержка для стабильности SRT
-									time.Sleep(1 * time.Millisecond)
 								} else {
 									// Если буфер пустой, отправляем пустой пакет для поддержания соединения
 									// Это предотвращает таймаут SRT
@@ -393,6 +512,10 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 		updateTicker := time.NewTicker(2 * time.Second)
 		defer updateTicker.Stop()
 
+		// Горутина мониторинга буферов
+		bufferMonitorTicker := time.NewTicker(30 * time.Second)
+		defer bufferMonitorTicker.Stop()
+
 		go func() {
 			for {
 				select {
@@ -411,6 +534,19 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 							outputMgr.RemoveOutput(url)
 						}
 					}
+				case <-bufferMonitorTicker.C:
+					// Мониторинг состояния буферов каждые 30 секунд
+					outputs := outputMgr.AllOutputs()
+					for url, w := range outputs {
+						bufferSize := len(w.ch)
+						fillPercentage := (bufferSize * 100) / bufSize
+
+						if bufferSize > bufSize*3/4 {
+							log.Printf("[WARNING] Output buffer for %s is %d%% full: %d/%d packets", url, fillPercentage, bufferSize, bufSize)
+						} else {
+							log.Printf("[MONITOR] Output buffer for %s is %d%% full: %d/%d packets", url, fillPercentage, bufferSize, bufSize)
+						}
+					}
 				}
 			}
 		}()
@@ -423,12 +559,38 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 				close(stopChan)
 				break
 			}
-			for _, w := range outputMgr.AllOutputs() {
+
+			// Неблокирующая отправка пакетов в выходы
+			outputs := outputMgr.AllOutputs()
+			droppedCount := 0
+
+			for _, w := range outputs {
 				select {
 				case w.ch <- pkt:
+					// Успешно отправлен
 				default:
 					// буфер заполнен — дропаем пакет для этого выхода
+					droppedCount++
+					log.Printf("[WARNING] Output buffer full, dropping packet for output")
+
+					// Логируем размер буфера для диагностики
+					log.Printf("[DEBUG] Channel buffer size: %d", len(w.ch))
 				}
+			}
+
+			// Если дропнули пакеты для всех выходов, это серьезная проблема
+			if droppedCount == len(outputs) && len(outputs) > 0 {
+				log.Printf("[ERROR] All outputs are blocked! Dropped packet for all %d outputs", len(outputs))
+
+				// Логируем состояние всех выходов для диагностики
+				for url, w := range outputs {
+					bufferSize := len(w.ch)
+					log.Printf("[DEBUG] Output %s buffer state: %d/%d packets", url, bufferSize, bufSize)
+				}
+
+				// Не очищаем буферы - это может сломать выходы
+				// Вместо этого просто логируем проблему
+				log.Printf("[WARNING] All outputs are slow, packets will be dropped until they catch up")
 			}
 		}
 		log.Printf("Publish finished: %s", srcConn.URL)
@@ -441,5 +603,6 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 		for _, w := range outputMgr.AllOutputs() {
 			close(w.ch)
 		}
+		log.Printf("[DEBUG] All output channels closed for: %s", srcConn.URL)
 	}
 }
