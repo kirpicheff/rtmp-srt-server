@@ -252,6 +252,7 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 							time.Sleep(time.Duration(reconnectInterval) * time.Second)
 							continue
 						}
+					rtmpLoop:
 						for {
 							select {
 							case <-stop:
@@ -274,7 +275,7 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 									reconnectInterval := sm.config.ReconnectInterval
 									sm.mu.RUnlock()
 									time.Sleep(time.Duration(reconnectInterval) * time.Second)
-									break
+									break rtmpLoop
 								}
 								totalBytes += int64(len(pkt.Data))
 								sm.UpdateOutputBitrate(inputCfg.Name, url, totalBytes)
@@ -352,6 +353,7 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 							tsBuf.Reset()
 						}
 
+					srtLoop:
 						for {
 							select {
 							case <-stop:
@@ -428,7 +430,7 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 									conn.Close()
 									sm.SetOutputActive(inputCfg.Name, url, false)
 									time.Sleep(time.Duration(reconnectInterval) * time.Second)
-									break
+									break srtLoop
 								}
 
 								// Логируем обработку пакетов для диагностики блокировки
@@ -476,7 +478,7 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 											conn.Close()
 											sm.SetOutputActive(inputCfg.Name, url, false)
 											time.Sleep(time.Duration(reconnectInterval) * time.Second)
-											break
+											break srtLoop
 										}
 
 										totalBytes += int64(len(tsData))
@@ -492,7 +494,7 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 										conn.Close()
 										sm.SetOutputActive(inputCfg.Name, url, false)
 										time.Sleep(time.Duration(reconnectInterval) * time.Second)
-										break
+										break srtLoop
 									}
 								} else {
 									// Если буфер пустой, ничего не делаем, просто ждем следующий пакет.
