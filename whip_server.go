@@ -547,6 +547,9 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 							return
 						}
 
+						// Обработка временных меток для RTMP
+						validateTiming(&pkt)
+
 						writeDone := make(chan error, 1)
 						go func() {
 							writeDone <- dstConn.WritePacket(pkt)
@@ -617,13 +620,7 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 				w.manager.SetOutputActive(inputName, url, true)
 
 				// Правильная обработка временных меток для SRT
-				var baseTime time.Duration
-				var baseTimeSet bool
-				var lastVideoTime time.Duration
-				var lastAudioTime time.Duration
-				// Убираем ресинхронизацию - она ломает кодировщик
-				// const resyncInterval = 10 * time.Minute
-				// const maxNormalizedTime = 30 * time.Minute
+				timingProcessor := NewTimingProcessor()
 
 				var tsBuf bytes.Buffer
 				muxer := ts.NewMuxer(&tsBuf)
@@ -675,61 +672,12 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 							return
 						}
 
-						// Обработка временных меток для SRT
-						if !baseTimeSet {
-							// Ждем первый ключевой кадр для установки базового времени
-							if pkt.IsKeyFrame {
-								// Не устанавливаем baseTime если временная метка уже 0
-								if pkt.Time > 0 {
-									baseTime = pkt.Time
-									log.Printf("[WHIP] SRT base time set to: %v", baseTime)
-								} else {
-									log.Printf("[WHIP] SRT first keyframe has zero timestamp, skipping base time setup")
-								}
-								baseTimeSet = true
-							} else {
-								// Пропускаем пакеты до первого ключевого кадра
-								continue
-							}
-						}
-
-						// Простая нормализация без ресинхронизации
-						normalizedTime := pkt.Time - baseTime
-						if normalizedTime < 0 {
-							normalizedTime = 0
-						}
-
-						// Логируем детали нормализации для отладки
-						if pkt.IsKeyFrame {
-							log.Printf("[WHIP] Keyframe - Original: %v, Base: %v, Normalized: %v", pkt.Time, baseTime, normalizedTime)
-						}
-
-						// Создаем новый пакет с нормализованной временной меткой
-						normalizedPkt := av.Packet{
-							Data:       pkt.Data,
-							Time:       normalizedTime,
-							Idx:        pkt.Idx,
-							IsKeyFrame: pkt.IsKeyFrame,
-						}
-
-						// Проверяем монотонность временных меток
-						if pkt.Idx == 0 { // Video
-							if normalizedTime < lastVideoTime {
-								normalizedTime = lastVideoTime
-								normalizedPkt.Time = normalizedTime
-							}
-							lastVideoTime = normalizedTime
-						} else { // Audio
-							if normalizedTime < lastAudioTime {
-								normalizedTime = lastAudioTime
-								normalizedPkt.Time = normalizedTime
-							}
-							lastAudioTime = normalizedTime
-						}
+						// Обработка временных меток для SRT с TimingProcessor
+						timingProcessor.Process(&pkt)
 
 						// Сохраняем текущую позицию в буфере перед записью
 						bufferPosBefore := tsBuf.Len()
-						err = muxer.WritePacket(normalizedPkt)
+						err = muxer.WritePacket(pkt)
 						if err != nil {
 							log.Printf("[WHIP] TS WritePacket error for %s: %v", url, err)
 							conn.Close()
