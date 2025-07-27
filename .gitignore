@@ -5,3 +5,4 @@ config.yaml
 joy4/
 *.cmd
 bin/
+*.exe~
