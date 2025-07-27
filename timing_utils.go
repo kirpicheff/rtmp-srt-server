@@ -23,6 +23,8 @@ type TimingProcessor struct {
 	lastVideoTime atomic.Value // time.Duration
 	lastAudioTime atomic.Value // time.Duration
 	lastKeyframe  atomic.Value // time.Time
+	lastPCRTime   atomic.Value // time.Time - время последнего PCR
+	lastPCRValue  atomic.Value // time.Duration - значение последнего PCR
 	stats         TimingStats
 }
 
@@ -38,6 +40,8 @@ func NewTimingProcessor() *TimingProcessor {
 	tp.lastVideoTime.Store(time.Duration(0))
 	tp.lastAudioTime.Store(time.Duration(0))
 	tp.lastKeyframe.Store(time.Time{})
+	tp.lastPCRTime.Store(time.Time{})
+	tp.lastPCRValue.Store(time.Duration(0))
 	return tp
 }
 
@@ -131,19 +135,71 @@ func (tp *TimingProcessor) validateFinalTiming(pkt *av.Packet) {
 
 func (tp *TimingProcessor) monitorPCR(currentPCR time.Duration) {
 	now := time.Now()
-	lastPCR := tp.lastVideoTime.Load().(time.Duration)
-	lastTime := tp.lastKeyframe.Load().(time.Time)
+	lastPCRTime := tp.lastPCRTime.Load().(time.Time)
+	lastPCRValue := tp.lastPCRValue.Load().(time.Duration)
 
-	if !lastTime.IsZero() {
-		expected := currentPCR - lastPCR
-		actual := now.Sub(lastTime)
-		drift := actual - expected
-
-		if absDuration(drift) > maxDrift+warnBuffer {
-			tp.stats.PCRDrifts++
-			log.Printf("[PCR] Drift: %v (allowed ±%v)", drift, maxDrift)
-		}
+	// Проверка разумности значения PCR
+	if currentPCR < 0 {
+		log.Printf("[PCR] Warning: negative PCR value: %v", currentPCR)
+		return
 	}
+
+	if !lastPCRTime.IsZero() {
+		// Проверка разумности интервала
+		timeSinceLast := now.Sub(lastPCRTime)
+		if timeSinceLast > 10*time.Second {
+			log.Printf("[PCR] Warning: large time gap since last PCR: %v", timeSinceLast)
+			// Сбрасываем состояние при слишком большом разрыве
+			tp.resetPCRState(now, currentPCR)
+			return
+		}
+
+		// Защита от переполнения - проверка монотонности PCR
+		if currentPCR < lastPCRValue {
+			log.Printf("[PCR] Non-monotonic: %v < %v", currentPCR, lastPCRValue)
+			tp.resetPCRState(now, currentPCR)
+			return
+		}
+
+		// PCR уже измеряется в единицах времени (time.Duration)
+		// Ожидаемое время между PCR значениями
+		expectedTimeInterval := currentPCR - lastPCRValue
+		actualTimeInterval := now.Sub(lastPCRTime)
+		drift := actualTimeInterval - expectedTimeInterval
+
+		// Градуированная обработка дрейфа
+		switch {
+		case absDuration(drift) > 1*time.Second:
+			// Критично - сбрасываем состояние
+			log.Printf("[PCR] CRITICAL drift: %v (expected: %v, actual: %v)",
+				drift, expectedTimeInterval, actualTimeInterval)
+			tp.resetPCRState(now, currentPCR)
+			return
+		case absDuration(drift) > 100*time.Millisecond:
+			// Предупреждение
+			log.Printf("[PCR] WARNING drift: %v (expected: %v, actual: %v)",
+				drift, expectedTimeInterval, actualTimeInterval)
+			tp.stats.PCRDrifts++
+		case absDuration(drift) > maxDrift+warnBuffer:
+			// Обычное предупреждение
+			log.Printf("[PCR] Drift: %v (expected: %v, actual: %v)",
+				drift, expectedTimeInterval, actualTimeInterval)
+			tp.stats.PCRDrifts++
+		}
+	} else {
+		// Первое измерение - просто логируем
+		log.Printf("[PCR] First PCR measurement: %v", currentPCR)
+	}
+
+	// Обновляем значения для следующего измерения
+	tp.lastPCRTime.Store(now)
+	tp.lastPCRValue.Store(currentPCR)
+}
+
+func (tp *TimingProcessor) resetPCRState(now time.Time, currentPCR time.Duration) {
+	tp.lastPCRTime.Store(now)
+	tp.lastPCRValue.Store(currentPCR)
+	log.Printf("[PCR] State reset to: %v", currentPCR)
 }
 
 func (tp *TimingProcessor) GetStats() TimingStats {
@@ -213,13 +269,37 @@ func checkPCRDrift(currentPCR time.Duration) {
 		prevPCR := lastPCRVal.Load().(time.Duration)
 		prevTime := lastPCR.Load().(time.Time)
 
-		expected := currentPCR - prevPCR
-		actual := now.Sub(prevTime)
-		drift := actual - expected
+		// Защита от переполнения - проверка монотонности PCR
+		if currentPCR < prevPCR {
+			log.Printf("[PCR] Global non-monotonic: %v < %v", currentPCR, prevPCR)
+			lastPCR.Store(now)
+			lastPCRVal.Store(currentPCR)
+			return
+		}
 
-		if absDuration(drift) > maxDrift+warnBuffer {
-			log.Printf("[PCR] Significant drift detected: %v (allowed: ±%v)",
-				drift, maxDrift)
+		// PCR уже измеряется в единицах времени (time.Duration)
+		// Ожидаемое время между PCR значениями
+		expectedTimeInterval := currentPCR - prevPCR
+		actualTimeInterval := now.Sub(prevTime)
+		drift := actualTimeInterval - expectedTimeInterval
+
+		// Градуированная обработка дрейфа
+		switch {
+		case absDuration(drift) > 1*time.Second:
+			// Критично - сбрасываем состояние
+			log.Printf("[PCR] Global CRITICAL drift: %v (expected: %v, actual: %v)",
+				drift, expectedTimeInterval, actualTimeInterval)
+			lastPCR.Store(now)
+			lastPCRVal.Store(currentPCR)
+			return
+		case absDuration(drift) > 100*time.Millisecond:
+			// Предупреждение
+			log.Printf("[PCR] Global WARNING drift: %v (expected: %v, actual: %v)",
+				drift, expectedTimeInterval, actualTimeInterval)
+		case absDuration(drift) > maxDrift+warnBuffer:
+			// Обычное предупреждение
+			log.Printf("[PCR] Global drift: %v (expected: %v, actual: %v)",
+				drift, expectedTimeInterval, actualTimeInterval)
 		}
 	}
 
