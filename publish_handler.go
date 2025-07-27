@@ -153,6 +153,7 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 				}()
 
 				var totalBytes int64
+				var lastBitrateUpdateTime time.Time
 				var packetCount int64
 				var lastLogTime time.Time
 
@@ -224,7 +225,11 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 									break
 								}
 								totalBytes += int64(len(pkt.Data))
-								sm.UpdateOutputBitrate(inputCfg.Name, url, totalBytes)
+								now := time.Now()
+								if now.Sub(lastBitrateUpdateTime) > 1*time.Second {
+									sm.UpdateOutputBitrate(inputCfg.Name, url, totalBytes)
+									lastBitrateUpdateTime = now
+								}
 							}
 						}
 						return
@@ -265,9 +270,27 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 									sm.SetOutputActive(inputCfg.Name, url, false)
 									return
 								}
-								err = dstConn.WritePacket(pkt)
-								if err != nil {
-									log.Printf("Write error to %s: %v", url, err)
+
+								writeDone := make(chan error, 1)
+								go func() {
+									writeDone <- dstConn.WritePacket(pkt)
+								}()
+
+								select {
+								case err = <-writeDone:
+									if err != nil {
+										log.Printf("Write error to %s: %v", url, err)
+										dstConn.Close()
+										sm.SetOutputActive(inputCfg.Name, url, false)
+										// Получаем актуальный интервал переподключения
+										sm.mu.RLock()
+										reconnectInterval := sm.config.ReconnectInterval
+										sm.mu.RUnlock()
+										time.Sleep(time.Duration(reconnectInterval) * time.Second)
+										break rtmpLoop
+									}
+								case <-time.After(5 * time.Second):
+									log.Printf("RTMP write timeout for %s, forcing reconnect", url)
 									dstConn.Close()
 									sm.SetOutputActive(inputCfg.Name, url, false)
 									// Получаем актуальный интервал переподключения
@@ -277,8 +300,13 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 									time.Sleep(time.Duration(reconnectInterval) * time.Second)
 									break rtmpLoop
 								}
+
 								totalBytes += int64(len(pkt.Data))
-								sm.UpdateOutputBitrate(inputCfg.Name, url, totalBytes)
+								now := time.Now()
+								if now.Sub(lastBitrateUpdateTime) > 1*time.Second {
+									sm.UpdateOutputBitrate(inputCfg.Name, url, totalBytes)
+									lastBitrateUpdateTime = now
+								}
 							}
 						}
 					} else if strings.HasPrefix(url, "srt://") {
@@ -481,8 +509,14 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 											break srtLoop
 										}
 
-										totalBytes += int64(len(tsData))
-										sm.UpdateOutputBitrate(inputCfg.Name, url, totalBytes)
+										now := time.Now()
+										if now.Sub(lastBitrateUpdateTime) > 1*time.Second {
+											totalBytes += int64(len(tsData))
+											sm.UpdateOutputBitrate(inputCfg.Name, url, totalBytes)
+											lastBitrateUpdateTime = now
+										} else {
+											totalBytes += int64(len(tsData))
+										}
 										tsBuf.Reset()
 
 										// Небольшая задержка для стабильности SRT - убираем, т.к. вносит ненужную задержку

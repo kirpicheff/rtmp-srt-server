@@ -413,6 +413,7 @@ func (w *WHIPServer) startFFmpegPipeline(session *WHIPSession, inputCfg *InputCf
 func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<-chan av.Packet, <-chan struct{}) {
 	return func(ch <-chan av.Packet, stop <-chan struct{}) {
 		var totalBytes int64
+		var lastBitrateUpdateTime time.Time
 		inputName := session.inputName
 
 		// Ждём, пока появятся stream-данные от ffmpeg, прежде чем подключаться
@@ -498,7 +499,11 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 							break // Выход из внутреннего цикла для переподключения
 						}
 						totalBytes += int64(len(pkt.Data))
-						w.manager.UpdateOutputBitrate(inputName, url, totalBytes)
+						now := time.Now()
+						if now.Sub(lastBitrateUpdateTime) > 1*time.Second {
+							w.manager.UpdateOutputBitrate(inputName, url, totalBytes)
+							lastBitrateUpdateTime = now
+						}
 					}
 				}
 			} else if strings.HasPrefix(url, "rtmp://") {
@@ -541,9 +546,26 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 							w.manager.SetOutputActive(inputName, url, false)
 							return
 						}
-						err = dstConn.WritePacket(pkt)
-						if err != nil {
-							log.Printf("[WHIP] Write error to %s: %v", url, err)
+
+						writeDone := make(chan error, 1)
+						go func() {
+							writeDone <- dstConn.WritePacket(pkt)
+						}()
+
+						select {
+						case err = <-writeDone:
+							if err != nil {
+								log.Printf("[WHIP] Write error to %s: %v", url, err)
+								dstConn.Close()
+								w.manager.SetOutputActive(inputName, url, false)
+								w.manager.mu.RLock()
+								reconnectInterval := w.manager.config.ReconnectInterval
+								w.manager.mu.RUnlock()
+								time.Sleep(time.Duration(reconnectInterval) * time.Second)
+								break rtmpWriteLoop
+							}
+						case <-time.After(5 * time.Second):
+							log.Printf("[WHIP] RTMP write timeout for %s, forcing reconnect", url)
 							dstConn.Close()
 							w.manager.SetOutputActive(inputName, url, false)
 							w.manager.mu.RLock()
@@ -552,8 +574,13 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 							time.Sleep(time.Duration(reconnectInterval) * time.Second)
 							break rtmpWriteLoop
 						}
+
 						totalBytes += int64(len(pkt.Data))
-						w.manager.UpdateOutputBitrate(inputName, url, totalBytes)
+						now := time.Now()
+						if now.Sub(lastBitrateUpdateTime) > 1*time.Second {
+							w.manager.UpdateOutputBitrate(inputName, url, totalBytes)
+							lastBitrateUpdateTime = now
+						}
 					}
 				}
 			} else if strings.HasPrefix(url, "srt://") {
@@ -721,8 +748,15 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 								time.Sleep(time.Duration(reconnectInterval) * time.Second)
 								break srtWriteLoop
 							}
-							totalBytes += int64(len(newData))
-							w.manager.UpdateOutputBitrate(inputName, url, totalBytes)
+
+							now := time.Now()
+							if now.Sub(lastBitrateUpdateTime) > 1*time.Second {
+								totalBytes += int64(len(newData))
+								w.manager.UpdateOutputBitrate(inputName, url, totalBytes)
+								lastBitrateUpdateTime = now
+							} else {
+								totalBytes += int64(len(newData))
+							}
 
 							// Сбрасываем буфер если он стал слишком большим (более 1MB)
 							if tsBuf.Len() > 1024*1024 {

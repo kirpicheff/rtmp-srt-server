@@ -323,6 +323,7 @@ func (s *SRTServer) handleSRTOutput(inputName, outputURL string, dataCh <-chan [
 
 	var totalBytes int64
 	var packetCount int64
+	var lastBitrateUpdateTime time.Time
 
 	for {
 		select {
@@ -387,7 +388,11 @@ func (s *SRTServer) handleSRTOutput(inputName, outputURL string, dataCh <-chan [
 				packetCount++
 
 				// Обновляем битрейт в StreamManager
-				s.manager.UpdateOutputBitrate(inputName, outputURL, totalBytes)
+				now := time.Now()
+				if now.Sub(lastBitrateUpdateTime) > 1*time.Second {
+					s.manager.UpdateOutputBitrate(inputName, outputURL, totalBytes)
+					lastBitrateUpdateTime = now
+				}
 			}
 		}
 	}
