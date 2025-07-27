@@ -358,6 +358,7 @@ func (s *SRTServer) handleSRTOutput(inputName, outputURL string, dataCh <-chan [
 		s.manager.SetOutputActive(inputName, outputURL, true)
 
 		// Отправляем данные
+	srtWriteLoop:
 		for {
 			select {
 			case <-stopCh:
@@ -379,7 +380,7 @@ func (s *SRTServer) handleSRTOutput(inputName, outputURL string, dataCh <-chan [
 					s.manager.IncrementOutputError(inputName, outputURL)
 					conn.Close()
 					s.manager.SetOutputActive(inputName, outputURL, false)
-					break
+					break srtWriteLoop
 				}
 
 				totalBytes += int64(len(data))

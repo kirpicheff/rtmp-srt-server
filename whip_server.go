@@ -524,6 +524,7 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 					time.Sleep(time.Duration(reconnectInterval) * time.Second)
 					continue
 				}
+			rtmpWriteLoop:
 				for {
 					select {
 					case <-stop:
@@ -549,7 +550,7 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 							reconnectInterval := w.manager.config.ReconnectInterval
 							w.manager.mu.RUnlock()
 							time.Sleep(time.Duration(reconnectInterval) * time.Second)
-							break
+							break rtmpWriteLoop
 						}
 						totalBytes += int64(len(pkt.Data))
 						w.manager.UpdateOutputBitrate(inputName, url, totalBytes)
@@ -608,6 +609,7 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 					time.Sleep(time.Duration(reconnectInterval) * time.Second)
 					continue
 				}
+			srtWriteLoop:
 				for {
 					select {
 					case <-stop:
@@ -706,7 +708,7 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 							conn.Close()
 							w.manager.SetOutputActive(inputName, url, false)
 							time.Sleep(time.Duration(reconnectInterval) * time.Second)
-							break
+							break srtWriteLoop
 						}
 						// Отправляем только новые данные, добавленные этим пакетом
 						if tsBuf.Len() > bufferPosBefore {
@@ -717,7 +719,7 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 								conn.Close()
 								w.manager.SetOutputActive(inputName, url, false)
 								time.Sleep(time.Duration(reconnectInterval) * time.Second)
-								break
+								break srtWriteLoop
 							}
 							totalBytes += int64(len(newData))
 							w.manager.UpdateOutputBitrate(inputName, url, totalBytes)

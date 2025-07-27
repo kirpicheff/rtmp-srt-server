@@ -3,3 +3,5 @@
 config.yaml 
 *.zip
 joy4/
+*.cmd
+bin/
