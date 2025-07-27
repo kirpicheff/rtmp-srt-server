@@ -396,25 +396,29 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 
 								// Создаем новый пакет с нормализованной временной меткой
 								normalizedPkt := av.Packet{
-									Data:       pkt.Data,
-									Time:       normalizedTime,
-									Idx:        pkt.Idx,
-									IsKeyFrame: pkt.IsKeyFrame,
+									Data:            pkt.Data,
+									Time:            normalizedTime,
+									Idx:             pkt.Idx,
+									IsKeyFrame:      pkt.IsKeyFrame,
+									CompositionTime: pkt.CompositionTime,
 								}
 
-								// Проверяем монотонность временных меток
+								// Проверяем и корректируем монотонность временных меток
 								if pkt.Idx == 0 { // Video
 									if normalizedTime < lastVideoTime {
-										normalizedTime = lastVideoTime
-										normalizedPkt.Time = normalizedTime
+										// Если таймстемп меньше предыдущего, плавно увеличиваем его,
+										// чтобы избежать дублирования и рывков.
+										normalizedTime = lastVideoTime + time.Millisecond
 									}
 									lastVideoTime = normalizedTime
+									normalizedPkt.Time = normalizedTime
 								} else { // Audio
 									if normalizedTime < lastAudioTime {
-										normalizedTime = lastAudioTime
-										normalizedPkt.Time = normalizedTime
+										// То же самое для аудио
+										normalizedTime = lastAudioTime + time.Millisecond
 									}
 									lastAudioTime = normalizedTime
+									normalizedPkt.Time = normalizedTime
 								}
 
 								// Записываем пакет в TS муксер
@@ -479,8 +483,8 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 										sm.UpdateOutputBitrate(inputCfg.Name, url, totalBytes)
 										tsBuf.Reset()
 
-										// Небольшая задержка для стабильности SRT
-										time.Sleep(1 * time.Millisecond)
+										// Небольшая задержка для стабильности SRT - убираем, т.к. вносит ненужную задержку
+										// time.Sleep(1 * time.Millisecond)
 
 									case <-time.After(3 * time.Second):
 										// Таймаут записи - закрываем соединение
@@ -491,9 +495,9 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 										break
 									}
 								} else {
-									// Если буфер пустой, отправляем пустой пакет для поддержания соединения
-									// Это предотвращает таймаут SRT
-									time.Sleep(10 * time.Millisecond)
+									// Если буфер пустой, ничего не делаем, просто ждем следующий пакет.
+									// Задержка здесь приводила к замедлению всего пайплайна.
+									// time.Sleep(10 * time.Millisecond)
 								}
 							}
 						}
