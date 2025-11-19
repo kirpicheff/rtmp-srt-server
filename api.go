@@ -285,7 +285,7 @@ func (api *APIServer) handleAddOutput(w http.ResponseWriter, r *http.Request) {
 	input.Outputs = append(input.Outputs, req.URL)
 	api.SM.RegisterOutput(req.Name, req.URL)
 	// Обновляем config.yaml
-	go updateConfigYAML(api.SM.inputs)
+	go updateInputsInConfig(api.SM.inputs)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -316,7 +316,7 @@ func (api *APIServer) handleRemoveOutput(w http.ResponseWriter, r *http.Request)
 	// Очищаем неактуальные выходы
 	api.SM.CleanupRemovedOutputs(req.Name)
 	// Обновляем config.yaml
-	go updateConfigYAML(api.SM.inputs)
+	go updateInputsInConfig(api.SM.inputs)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -442,37 +442,85 @@ func writeJSON(w http.ResponseWriter, data interface{}) {
 	}
 }
 
-// Обновляет config.yaml на лету (через структуру Config)
-func updateConfigYAML(inputs map[string]*InputCfg) {
-	// Читаем текущий config.yaml в структуру
+// updateInputsInConfig обновляет только секцию inputs в config.yaml, сохраняя комментарии.
+func updateInputsInConfig(inputs map[string]*InputCfg) {
 	data, err := os.ReadFile("config.yaml")
 	if err != nil {
-		log.Printf("[API] Failed to read config.yaml: %v", err)
+		log.Printf("[API] Failed to read config.yaml for update: %v", err)
 		return
 	}
-	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		log.Printf("[API] Failed to parse config.yaml: %v", err)
+
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		log.Printf("[API] Failed to parse config.yaml for update: %v", err)
 		return
 	}
-	// Обновляем outputs для каждого входа
-	for i := range cfg.Inputs {
-		name := cfg.Inputs[i].Name
-		if in, ok := inputs[name]; ok {
-			cfg.Inputs[i].Outputs = in.Outputs
+
+	// Находим узел 'inputs'
+	var inputsNode *yaml.Node
+	if root.Content[0].Kind == yaml.MappingNode {
+		for i := 0; i < len(root.Content[0].Content); i += 2 {
+			if root.Content[0].Content[i].Value == "inputs" {
+				inputsNode = root.Content[0].Content[i+1]
+				break
+			}
 		}
 	}
-	// Сохраняем обратно
-	out, err := yaml.Marshal(&cfg)
+
+	if inputsNode == nil || inputsNode.Kind != yaml.SequenceNode {
+		log.Printf("[API] 'inputs' section not found or not a sequence in config.yaml")
+		return
+	}
+
+	// Обновляем дочерние узлы
+	for _, inputNode := range inputsNode.Content {
+		if inputNode.Kind != yaml.MappingNode {
+			continue
+		}
+		var name string
+		var outputsNode *yaml.Node
+		for i := 0; i < len(inputNode.Content); i += 2 {
+			keyNode := inputNode.Content[i]
+			valNode := inputNode.Content[i+1]
+			if keyNode.Value == "name" {
+				name = valNode.Value
+			}
+			if keyNode.Value == "outputs" {
+				outputsNode = valNode
+			}
+		}
+
+		if name != "" && outputsNode != nil {
+			if memInput, ok := inputs[name]; ok {
+				// Создаем новый узел для outputs
+				newOutputsNode := yaml.Node{Kind: yaml.SequenceNode}
+				for _, outURL := range memInput.Outputs {
+					newOutputsNode.Content = append(newOutputsNode.Content, &yaml.Node{
+						Kind:  yaml.ScalarNode,
+						Value: outURL,
+					})
+				}
+				*outputsNode = newOutputsNode
+			}
+		}
+	}
+
+	// Сохраняем обновленный YAML
+	file, err := os.Create("config.yaml")
 	if err != nil {
-		log.Printf("[API] Failed to marshal config.yaml: %v", err)
+		log.Printf("[API] Failed to open config.yaml for writing: %v", err)
 		return
 	}
-	if err := os.WriteFile("config.yaml", out, 0644); err != nil {
-		log.Printf("[API] Failed to write config.yaml: %v", err)
+	defer file.Close()
+
+	encoder := yaml.NewEncoder(file)
+	encoder.SetIndent(2) // Сохраняем форматирование
+	if err := encoder.Encode(&root); err != nil {
+		log.Printf("[API] Failed to write updated config.yaml: %v", err)
 		return
 	}
-	log.Printf("[API] config.yaml updated (pretty)")
+
+	log.Printf("[API] config.yaml updated preserving comments.")
 }
 
 // Обработчик веб-интерфейса
