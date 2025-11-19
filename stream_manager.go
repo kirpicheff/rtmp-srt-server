@@ -90,6 +90,10 @@ func NewStreamManager(cfgs []InputCfg, cfg *Config) *StreamManager {
 			URLPath: c.URLPath,
 			Active:  false,
 		}
+		// Регистрируем выходы из конфигурации
+		for _, outURL := range c.Outputs {
+			sm.RegisterOutput(c.Name, outURL)
+		}
 	}
 	return sm
 }

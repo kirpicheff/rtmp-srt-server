@@ -6,3 +6,4 @@ joy4/
 *.cmd
 bin/
 *.exe~
+temp.txt
