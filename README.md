@@ -164,6 +164,10 @@ log_to_file: true
 log_file: "server.log"
 reconnect_interval: 5
 
+whip_settings:
+  ice_servers:
+    - "stun:stun.l.google.com:19302"
+
 # Example of inputs
 # You can also add/remove them via the web interface
 inputs:
@@ -374,7 +378,7 @@ v=0
 
 Поток будет автоматически обработан и направлен на все выходы, указанные в конфиге для данного input.
 
-# Русская версия ниже
+# Русская версия
 
 Сервер для ретрансляции RTMP-потоков с поддержкой SRT-выходов и веб-интерфейсом управления.
 
@@ -539,6 +543,10 @@ srt_settings:
 log_to_file: true
 log_file: "server.log"
 reconnect_interval: 5
+
+whip_settings:
+  ice_servers:
+    - "stun:stun.l.google.com:19302"
 
 # Example of inputs
 # You can also add/remove them via the web interface
@@ -733,7 +741,10 @@ go project/
   ```
 
 > **Важно:**
-> Для работы WHIP (и других функций, использующих ffmpeg) требуется, чтобы файл `ffmpeg.exe` находился в папке `bin` внутри директории с программой:
+> Для работы WHIP (и других функций, использующих ffmpeg) требуется наличие утилиты `ffmpeg` в системе.
+> Программа автоматически ищет `ffmpeg` в глобальных системных путях (переменная окружения `PATH`).
+>
+> Если вы работаете на Windows и хотите использовать локальный исполняемый файл, вы можете поместить `ffmpeg.exe` в подпапку `bin` внутри директории с программой:
 >
 > ```
 > go project/
