@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -32,6 +31,7 @@ type WHIPServer struct {
 	wg        sync.WaitGroup
 	sessions  map[string]*WHIPSession
 	sessionMu sync.RWMutex
+	stopCh    chan struct{} // Канал для сигнализации остановки сервера
 }
 
 type WHIPSession struct {
@@ -56,6 +56,7 @@ func NewWHIPServer(port int, manager *StreamManager) *WHIPServer {
 		port:     port,
 		manager:  manager,
 		sessions: make(map[string]*WHIPSession),
+		stopCh:   make(chan struct{}),
 	}
 }
 
@@ -78,7 +79,9 @@ func (w *WHIPServer) Start() error {
 
 		for {
 			select {
-			case <-time.After(5 * time.Minute):
+			case <-w.stopCh:
+				return
+			case <-ticker.C:
 				uptime := time.Since(startTime)
 				w.sessionMu.RLock()
 				sessionCount := len(w.sessions)
@@ -101,6 +104,8 @@ func (w *WHIPServer) Start() error {
 }
 
 func (w *WHIPServer) Stop() error {
+	close(w.stopCh) // Останавливаем Heartbeat горутину
+
 	w.sessionMu.Lock()
 	for _, session := range w.sessions {
 		w.stopSession(session)
@@ -250,12 +255,35 @@ func (w *WHIPServer) handleWHIP(wr http.ResponseWriter, r *http.Request) {
 	log.Printf("[WHIP] SDP answer sent for stream '%s'", inputCfg.Name)
 }
 
-func (w *WHIPServer) startFFmpegPipeline(session *WHIPSession, inputCfg *InputCfg) {
-	rand.Seed(time.Now().UnixNano())
-	videoUDPPort := rand.Intn(10000) + 40000 // 40000-49999
-	audioUDPPort := rand.Intn(10000) + 50000 // 50000-59999
+func getRandomFreeUDPPort() (int, error) {
+	addr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+	if err != nil {
+		return 0, err
+	}
+	conn, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		return 0, err
+	}
+	defer conn.Close()
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return localAddr.Port, nil
+}
 
-	session.combinedSdpFilename = fmt.Sprintf("whip_combined_%s.sdp", session.inputName)
+func (w *WHIPServer) startFFmpegPipeline(session *WHIPSession, inputCfg *InputCfg) {
+	defer w.stopSession(session)
+
+	videoUDPPort, err := getRandomFreeUDPPort()
+	if err != nil {
+		log.Printf("[WHIP] Failed to get free UDP port for video: %v", err)
+		return
+	}
+	audioUDPPort, err := getRandomFreeUDPPort()
+	if err != nil {
+		log.Printf("[WHIP] Failed to get free UDP port for audio: %v", err)
+		return
+	}
+
+	session.combinedSdpFilename = fmt.Sprintf("whip_combined_%s_%d.sdp", session.inputName, time.Now().UnixNano())
 
 	// Создаём единый SDP файл для видео и аудио, чтобы ffmpeg понимал, что они связаны
 	combinedSdpContent := []byte(fmt.Sprintf(
@@ -367,9 +395,9 @@ func (w *WHIPServer) startFFmpegPipeline(session *WHIPSession, inputCfg *InputCf
 
 	// Горутина для динамического обновления выходов
 	updateTicker := time.NewTicker(2 * time.Second)
-	defer updateTicker.Stop()
 
 	go func() {
+		defer updateTicker.Stop()
 		for {
 			select {
 			case <-session.stopCh:
@@ -395,19 +423,6 @@ func (w *WHIPServer) startFFmpegPipeline(session *WHIPSession, inputCfg *InputCf
 	if hasOutputs && stdout != nil {
 		w.processFLVStream(stdout, session, inputCfg)
 	}
-
-	// Обновляем статус в менеджере
-	w.manager.SetStatusActive(session.inputName, false)
-
-	// Удаляем временный SDP файл
-	if session.combinedSdpFilename != "" {
-		if err := os.Remove(session.combinedSdpFilename); err != nil {
-			// Это не критичная ошибка, просто логируем, т.к. файл мог быть удален вручную или не создаться
-			log.Printf("[WHIP] Failed to remove temporary SDP file %s: %v", session.combinedSdpFilename, err)
-		}
-	}
-
-	log.Printf("[WHIP] Session stopped for '%s'", session.inputName)
 }
 
 func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<-chan av.Packet, <-chan struct{}) {
@@ -778,15 +793,15 @@ func (w *WHIPServer) processFLVStream(reader io.Reader, session *WHIPSession, in
 }
 
 func (w *WHIPServer) stopSession(session *WHIPSession) {
-	log.Printf("[WHIP] Stopping session for '%s'", session.inputName)
-
-	// Сначала закрываем канал остановки
+	// Сначала закрываем канал остановки или выходим, если уже закрыто
 	select {
 	case <-session.stopCh:
-		// Уже закрыт
+		return // Уже закрыто, выходим чтобы избежать дублирования очистки
 	default:
 		close(session.stopCh)
 	}
+
+	log.Printf("[WHIP] Stopping session for '%s'", session.inputName)
 
 	// Корректно закрываем writers чтобы FFmpeg получил EOF
 	if session.videoWriter != nil {
@@ -865,7 +880,15 @@ func (w *WHIPServer) handleVideoTrack(track *webrtc.TrackRemote, writer io.Write
 		if len(payload) > 0 {
 			_, err := writer.Write(payload)
 			if err != nil {
-				// Игнорируем ошибки, т.к. ffmpeg может быть еще не готов
+				// Если сессия закрывается или сокет закрыт, завершаем горутину
+				select {
+				case <-session.stopCh:
+					return
+				default:
+				}
+				if strings.Contains(err.Error(), "use of closed") {
+					return
+				}
 			}
 
 			packetCount++
@@ -903,7 +926,15 @@ func (w *WHIPServer) handleAudioTrack(track *webrtc.TrackRemote, writer io.Write
 		if len(payload) > 0 {
 			_, err := writer.Write(payload)
 			if err != nil {
-				// Игнорируем ошибки, т.к. ffmpeg может быть еще не готов
+				// Если сессия закрывается или сокет закрыт, завершаем горутину
+				select {
+				case <-session.stopCh:
+					return
+				default:
+				}
+				if strings.Contains(err.Error(), "use of closed") {
+					return
+				}
 			}
 
 			packetCount++
