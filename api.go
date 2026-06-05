@@ -196,16 +196,11 @@ func (api *APIServer) handleUpdateOutputs(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	api.SM.mu.RLock()
-	input, ok := api.SM.inputs[req.Name]
-	api.SM.mu.RUnlock()
-	if !ok {
+	// Обновляем Outputs потокобезопасно
+	if ok := api.SM.UpdateInputOutputs(req.Name, req.Outputs); !ok {
 		http.Error(w, "Input not found", http.StatusNotFound)
 		return
 	}
-
-	// Обновляем Outputs (указатель, потокобезопасно)
-	input.Outputs = req.Outputs
 
 	// Регистрируем новые выходы
 	for _, url := range req.Outputs {
@@ -267,25 +262,20 @@ func (api *APIServer) handleAddOutput(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
-	api.SM.mu.RLock()
-	input, ok := api.SM.inputs[req.Name]
-	api.SM.mu.RUnlock()
+
+	ok, alreadyExists := api.SM.AddOutputToInput(req.Name, req.URL)
 	if !ok {
 		http.Error(w, "Input not found", http.StatusNotFound)
 		return
 	}
-	// Проверяем, есть ли уже такой выход
-	for _, out := range input.Outputs {
-		if out == req.URL {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
+	if alreadyExists {
+		w.WriteHeader(http.StatusOK)
+		return
 	}
-	// Добавляем выход в память
-	input.Outputs = append(input.Outputs, req.URL)
+
 	api.SM.RegisterOutput(req.Name, req.URL)
-	// Обновляем config.yaml
-	go updateInputsInConfig(api.SM.inputs)
+	// Обновляем config.yaml, используя безопасную копию
+	go updateInputsInConfig(api.SM.GetInputsCopy())
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -298,25 +288,16 @@ func (api *APIServer) handleRemoveOutput(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
-	api.SM.mu.RLock()
-	input, ok := api.SM.inputs[req.Name]
-	api.SM.mu.RUnlock()
-	if !ok {
+
+	if ok := api.SM.RemoveOutputFromInput(req.Name, req.URL); !ok {
 		http.Error(w, "Input not found", http.StatusNotFound)
 		return
 	}
-	// Удаляем выход из памяти
-	newOuts := make([]string, 0, len(input.Outputs))
-	for _, out := range input.Outputs {
-		if out != req.URL {
-			newOuts = append(newOuts, out)
-		}
-	}
-	input.Outputs = newOuts
+
 	// Очищаем неактуальные выходы
 	api.SM.CleanupRemovedOutputs(req.Name)
-	// Обновляем config.yaml
-	go updateInputsInConfig(api.SM.inputs)
+	// Обновляем config.yaml, используя безопасную копию
+	go updateInputsInConfig(api.SM.GetInputsCopy())
 	w.WriteHeader(http.StatusOK)
 }
 

@@ -519,3 +519,67 @@ func (sm *StreamManager) GetOutputsForInput(inputName string) []*OutputStatus {
 	}
 	return []*OutputStatus{}
 }
+
+// UpdateInputOutputs обновляет список выходов для конкретного входа под блокировкой
+func (sm *StreamManager) UpdateInputOutputs(name string, outputs []string) bool {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	input, ok := sm.inputs[name]
+	if !ok {
+		return false
+	}
+	input.Outputs = outputs
+	return true
+}
+
+// AddOutputToInput добавляет выход в конфигурацию входа под блокировкой
+func (sm *StreamManager) AddOutputToInput(name string, url string) (ok bool, alreadyExists bool) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	input, ok := sm.inputs[name]
+	if !ok {
+		return false, false
+	}
+	for _, out := range input.Outputs {
+		if out == url {
+			return true, true
+		}
+	}
+	input.Outputs = append(input.Outputs, url)
+	return true, false
+}
+
+// RemoveOutputFromInput удаляет выход из конфигурации входа под блокировкой
+func (sm *StreamManager) RemoveOutputFromInput(name string, url string) bool {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	input, ok := sm.inputs[name]
+	if !ok {
+		return false
+	}
+	newOuts := make([]string, 0, len(input.Outputs))
+	for _, out := range input.Outputs {
+		if out != url {
+			newOuts = append(newOuts, out)
+		}
+	}
+	input.Outputs = newOuts
+	return true
+}
+
+// GetInputsCopy возвращает копию карты конфигурации входов
+func (sm *StreamManager) GetInputsCopy() map[string]*InputCfg {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	copyMap := make(map[string]*InputCfg)
+	for k, v := range sm.inputs {
+		copyOutputs := make([]string, len(v.Outputs))
+		copy(copyOutputs, v.Outputs)
+		copyMap[k] = &InputCfg{
+			Name:    v.Name,
+			URLPath: v.URLPath,
+			Outputs: copyOutputs,
+		}
+	}
+	return copyMap
+}

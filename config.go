@@ -69,7 +69,7 @@ func (cfg *Config) Validate() error {
 	if cfg.Server.RTMPPort <= 0 || cfg.Server.RTMPPort > 65535 {
 		return errors.New("server.rtmp_port must be between 1 and 65535")
 	}
-	if cfg.Server.SRTPort > 0 && (cfg.Server.SRTPort <= 0 || cfg.Server.SRTPort > 65535) {
+	if cfg.Server.SRTPort != 0 && (cfg.Server.SRTPort < 1 || cfg.Server.SRTPort > 65535) {
 		return errors.New("server.srt_port must be between 1 and 65535")
 	}
 	if cfg.ReconnectInterval < 1 {
