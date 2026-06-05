@@ -5,10 +5,13 @@ const translations = {
         'header.subtitle': 'Управление трансляциями и настройками сервера',
 
         // Навигация
-        'nav.status': '📊 Статус',
-        'nav.inputs': '📥 Входы',
-        'nav.outputs': '📤 Выходы',
-        'nav.settings': '⚙️ Настройки',
+        'nav.status': 'Дашборд',
+        'nav.inputs': 'Добавить вход',
+        'nav.outputs': 'Направления',
+        'nav.settings': 'Настройки',
+
+        // Общие
+        'common.inputs': 'Входы',
 
         // Общие
         'common.loading': 'Загрузка...',
@@ -33,7 +36,7 @@ const translations = {
         'common.updated': 'обновлено',
 
         // Статус
-        'status.title': 'Общий статус сервера',
+        'status.title': 'Панель мониторинга',
         'status.noInputs': 'Нет активных входов',
         'status.noOutputs': 'Нет выходов',
         'status.loadError': 'Ошибка загрузки статуса',
@@ -42,7 +45,7 @@ const translations = {
         'inputs.title': 'Управление входами',
         'inputs.addNew': 'Добавить новый вход',
         'inputs.inputName': 'Имя входа',
-        'inputs.rtmpPath': 'Путь RTMP',
+        'inputs.rtmpPath': 'Путь',
         'inputs.outputsPlaceholder': 'srt://example.com:9000\nrtmp://example.com/live/stream',
         'inputs.outputsLabel': 'Выходы (по одному на строку):',
         'inputs.existing': 'Существующие входы',
@@ -95,10 +98,13 @@ const translations = {
         'header.subtitle': 'Stream and server settings management',
 
         // Navigation
-        'nav.status': '📊 Status',
-        'nav.inputs': '📥 Inputs',
-        'nav.outputs': '📤 Outputs',
-        'nav.settings': '⚙️ Settings',
+        'nav.status': 'Dashboard',
+        'nav.inputs': 'Add Input',
+        'nav.outputs': 'Targets',
+        'nav.settings': 'Settings',
+
+        // Common
+        'common.inputs': 'Inputs',
 
         // Common
         'common.loading': 'Loading...',
@@ -123,7 +129,7 @@ const translations = {
         'common.updated': 'updated',
 
         // Status
-        'status.title': 'Server Status Overview',
+        'status.title': 'Dashboard',
         'status.noInputs': 'No active inputs',
         'status.noOutputs': 'No outputs',
         'status.loadError': 'Error loading status',
@@ -132,7 +138,7 @@ const translations = {
         'inputs.title': 'Input Management',
         'inputs.addNew': 'Add New Input',
         'inputs.inputName': 'Input Name',
-        'inputs.rtmpPath': 'RTMP Path',
+        'inputs.rtmpPath': 'Path',
         'inputs.outputsPlaceholder': 'srt://example.com:9000\nrtmp://example.com/live/stream',
         'inputs.outputsLabel': 'Outputs (one per line):',
         'inputs.existing': 'Existing Inputs',
@@ -222,7 +228,6 @@ function changeLanguage(lang) {
 
 // Конфигурация API
 const API_BASE = '/api';
-const API_CREDENTIALS = btoa('admin:secret'); // В продакшене лучше получать через форму входа
 
 // Глобальные переменные
 let currentTab = 'status';
@@ -288,9 +293,6 @@ function loadCurrentTab() {
         case 'inputs':
             loadInputs();
             break;
-        case 'outputs':
-            loadOutputsInitial(); // Используем специальную функцию для первоначальной загрузки
-            break;
         case 'settings':
             loadSettings();
             break;
@@ -302,21 +304,13 @@ function startAutoRefresh() {
     refreshInterval = setInterval(async () => {
         if (currentTab === 'status') {
             loadStatus();
-        } else if (currentTab === 'outputs') {
-            // Обновляем только статусы выходов, не трогаем форму
-            loadOutputs(); // Используем упрощенную функцию
         }
     }, 5000); // Обновляем статус каждые 5 секунд
 }
 
 // Обновление текущей вкладки
 function refreshCurrentTab() {
-    if (currentTab === 'outputs') {
-        // Для выходов обновляем только статусы
-        loadOutputsInitial();
-    } else {
-        loadCurrentTab();
-    }
+    loadCurrentTab();
 }
 
 // API функции
@@ -324,13 +318,19 @@ async function apiRequest(endpoint, options = {}) {
     const url = `${API_BASE}${endpoint}`;
     const defaultOptions = {
         headers: {
-            'Authorization': `Basic ${API_CREDENTIALS}`,
             'Content-Type': 'application/json'
         }
     };
 
     try {
-        const response = await fetch(url, { ...defaultOptions, ...options });
+        const response = await fetch(url, {
+            ...defaultOptions,
+            ...options,
+            headers: {
+                ...defaultOptions.headers,
+                ...options.headers
+            }
+        });
 
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -367,44 +367,141 @@ function displayStatus(statuses) {
         return;
     }
 
+    // Вычисление суммарной статистики
+    const totalInputs = statuses.length;
+    const activeInputs = statuses.filter(s => s.active).length;
+    let totalOutputsCount = 0;
+    let totalConnections = 0;
+    statuses.forEach(s => {
+        totalConnections += s.connections || 0;
+        if (s.outputs) {
+            totalOutputsCount += s.outputs.length;
+        }
+    });
+
     const html = `
-        <div style="margin-bottom: 20px; color: #6c757d; font-size: 0.9em;">
+        <div style="margin-bottom: 20px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 500;">
             ${t('common.lastUpdate')}: ${currentTime}
         </div>
-        ${statuses.map(input => `
-            <div class="status-card">
-                <h3>
-                    <span class="status-indicator ${input.active ? 'status-active' : 'status-inactive'}"></span>
-                    ${input.name}
-                </h3>
-                <p><strong>${t('common.path')}:</strong> ${input.url_path}</p>
-                <p><strong>${t('common.status')}:</strong> ${input.active ? t('common.active') : t('common.inactive')}</p>
-                <p><strong>${t('common.connections')}:</strong> ${input.connections}</p>
-                <p><strong>${t('common.errors')}:</strong> ${input.error_count}</p>
-                
-                ${input.outputs && input.outputs.length > 0 ? `
-                    <h4 style="margin-top: 15px; margin-bottom: 10px;">${t('common.outputs')}:</h4>
-                    ${input.outputs.map(output => `
-                        <div class="output-item">
-                            <div class="output-info">
-                                <div class="output-url">${output.url}</div>
-                                <div class="output-stats">
-                                    ${t('common.status')}: <span style="color: ${output.active ? '#27ae60' : '#e74c3c'}; font-weight: bold;">${output.active ? t('common.active') : t('common.inactive')}</span> | 
-                                    ${t('common.bitrate')}: <strong>${(output.bitrate_kbps || 0).toFixed(1)} kbps</strong> | 
-                                    ${t('common.uptime')}: <strong>${output.uptime || '00:00:00'}</strong> | 
-                                    ${t('common.errors')}: <strong>${output.error_count || 0}</strong>
+
+        <div class="summary-grid">
+            <div class="summary-card">
+                <div class="summary-title">${t('common.inputs')}</div>
+                <div class="summary-value">
+                    ${totalInputs} <span class="divider">/</span> <span class="active-val">${activeInputs}</span>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-title">${t('common.outputs')}</div>
+                <div class="summary-value">
+                    ${totalOutputsCount} <span class="divider">/</span> <span class="active-val">${statuses.reduce((acc, s) => acc + (s.outputs ? s.outputs.filter(o => o.active).length : 0), 0)}</span>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-title">${t('common.connections')}</div>
+                <div class="summary-value">${totalConnections}</div>
+            </div>
+        </div>
+
+        ${statuses.map(input => {
+            const lowerName = input.name.toLowerCase();
+            let proto = 'RTMP';
+            if (lowerName.includes('whip') || input.url_path.includes('/whip')) {
+                proto = 'WHIP';
+            } else if (lowerName.includes('srt') || input.url_path.includes('srt:')) {
+                proto = 'SRT';
+            }
+            const protoClass = proto === 'WHIP' ? 'badge-whip' : (proto === 'SRT' ? 'badge-srt' : 'badge-protocol');
+
+            return `
+                <div class="status-card proto-${proto.toLowerCase()}">
+                    <div class="flow-layout">
+                        <!-- Колонка Входа (Input Stream) -->
+                        <div class="input-column">
+                            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                                <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0;">${input.name}</h3>
+                                <span class="badge ${protoClass}">${proto}</span>
+                            </div>
+                            
+                            <div class="icon-wrapper">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            </div>
+
+                            <div>
+                                <div style="font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 2px;">${t('common.path')}</div>
+                                <div class="metric-value code" style="font-size: 0.8rem; word-break: break-all;">${input.url_path}</div>
+                            </div>
+
+                            <div style="display: flex; gap: 12px; font-size: 0.8rem;">
+                                <div>
+                                    <span style="color: var(--text-secondary);">${t('common.connections')}:</span>
+                                    <strong>${input.connections}</strong>
+                                </div>
+                                <div>
+                                    <span style="color: var(--text-secondary);">${t('common.status')}:</span>
+                                    <span class="badge ${input.active ? 'badge-active' : 'badge-inactive'}" style="padding: 2px 6px; font-size: 0.65rem;">
+                                        ${input.active ? t('common.active') : t('common.inactive')}
+                                    </span>
                                 </div>
                             </div>
-                            <div class="output-actions">
-                                <button class="btn btn-warning btn-small" onclick="reconnectOutput('${input.name}', '${output.url}')" title="${t('common.reconnect')}">
-                                    🔄
-                                </button>
+                        </div>
+
+                        <!-- Колонка Выходов (Output Streams) -->
+                        <div class="outputs-column">
+                            <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 4px; letter-spacing: 0.05em;">
+                                ${t('common.outputs')}
+                            </div>
+                            
+                            ${input.outputs && input.outputs.length > 0 ? input.outputs.map(output => `
+                                <div class="output-item">
+                                    <div class="output-info">
+                                        <div class="output-url">${output.url}</div>
+                                        <div class="output-meta-pills">
+                                            <span class="meta-pill ${output.active ? 'status-active' : 'status-inactive'}">
+                                                ${output.active ? t('common.active') : t('common.inactive')}
+                                            </span>
+                                            <span class="meta-pill stat-bitrate">
+                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 2px;"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+                                                <strong>${(output.bitrate_kbps || 0).toFixed(1)}</strong> kbps
+                                            </span>
+                                            <span class="meta-pill stat-uptime">
+                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 2px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                                <strong>${output.uptime || '00:00:00'}</strong>
+                                            </span>
+                                            <span class="meta-pill stat-errors ${output.error_count > 0 ? 'has-errors' : ''}">
+                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 2px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                                                <strong>${output.error_count || 0}</strong>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="output-actions">
+                                        <button class="btn btn-warning btn-small" onclick="reconnectOutput('${input.name}', '${output.url}')" title="${t('common.reconnect')}">
+                                            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                        </button>
+                                        <button class="btn btn-danger btn-small" onclick="removeOutputInline('${input.name}', '${output.url}')" title="${t('common.remove')}">
+                                            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('') : `<div style="font-size: 0.85rem; color: var(--text-secondary); padding: 8px 12px;">${t('status.noOutputs')}</div>`}
+
+                            <!-- Форма добавления нового выхода inline -->
+                            <div class="inline-add-output-container">
+                                <form onsubmit="addOutputInline(event, '${input.name}')" style="display: flex; gap: 12px; align-items: flex-end;">
+                                    <div style="flex: 1;">
+                                        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">${t('outputs.outputUrl')}:</label>
+                                        <input type="text" class="form-control" placeholder="srt://example.com:9000" required style="padding: 8px 12px; font-size: 0.85rem; height: 38px;">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary" style="padding: 8px 16px; height: 38px; font-size: 0.85rem;">
+                                        ${t('common.add')}
+                                    </button>
+                                </form>
                             </div>
                         </div>
-                    `).join('')}
-                ` : `<p>${t('status.noOutputs')}</p>`}
-            </div>
-        `).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('')}
     `;
 
     container.innerHTML = html;
@@ -425,8 +522,10 @@ function displayInputs(inputs) {
     const container = document.getElementById('inputs-content');
 
     const html = `
-        <div class="form-group">
-            <h3>${t('inputs.addNew')}</h3>
+        <div class="status-card">
+            <div class="card-header">
+                <h3>${t('inputs.addNew')}</h3>
+            </div>
             <form id="add-input-form">
                 <div class="form-row">
                     <div class="form-group">
@@ -442,24 +541,30 @@ function displayInputs(inputs) {
                     <label>${t('inputs.outputsLabel')}</label>
                     <textarea class="form-control" id="input-outputs" rows="3" placeholder="${t('inputs.outputsPlaceholder')}"></textarea>
                 </div>
-                <button type="submit" class="btn btn-success">${t('common.add')} ${t('nav.inputs').replace('📥 ', '').toLowerCase()}</button>
+                <button type="submit" class="btn btn-primary">${t('common.add')}</button>
             </form>
         </div>
         
-        <div class="form-group">
-            <h3>${t('inputs.existing')}</h3>
-            ${inputs.length === 0 ? `<p>${t('inputs.noInputs')}</p>` : inputs.map(input => `
-                <div class="output-item">
+        <div class="status-card">
+            <div class="card-header">
+                <h3>${t('inputs.existing')}</h3>
+            </div>
+            ${inputs.length === 0 ? `<div class="loading">${t('inputs.noInputs')}</div>` : inputs.map(input => `
+                <div class="output-item" style="border-left: 4px solid var(--accent-color);">
                     <div class="output-info">
                         <div class="output-url">${input.Name || input.name}</div>
-                        <div class="output-stats">
-                            ${t('common.path')}: ${input.URLPath || input.url_path} | 
-                            ${t('common.outputs')}: ${(input.Outputs || input.outputs || []).length}
+                        <div class="output-meta-pills">
+                            <span class="meta-pill stat-bitrate">
+                                ${t('common.path')}: <strong>${input.URLPath || input.url_path}</strong>
+                            </span>
+                            <span class="meta-pill stat-uptime">
+                                ${t('common.outputs')}: <strong>${(input.Outputs || input.outputs || []).length}</strong>
+                            </span>
                         </div>
                     </div>
                     <div class="output-actions">
-                        <button class="btn btn-danger btn-small" onclick="removeInput('${input.Name || input.name}')">
-                            🗑️
+                        <button class="btn btn-danger btn-small" onclick="removeInput('${input.Name || input.name}')" title="${t('common.remove')}">
+                            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                         </button>
                     </div>
                 </div>
@@ -541,7 +646,7 @@ async function loadOutputs() {
         displayOutputsStatus(statuses);
     } catch (error) {
         showError(t('outputs.loadError') + ': ' + error.message);
-        document.getElementById('outputs-status-container').innerHTML = `<div class="loading">${t('outputs.loadError')}...</div>`;
+        document.getElementById('outputs-status-container').innerHTML = `<div class="loading">${t('outputs.loadError')}</div>`;
     }
 }
 
@@ -555,8 +660,10 @@ function createOutputForm(inputs) {
     }
 
     const html = `
-        <div class="form-group">
-            <h3>${t('outputs.addOutput')}</h3>
+        <div class="status-card">
+            <div class="card-header">
+                <h3>${t('outputs.addOutput')}</h3>
+            </div>
             <form id="add-output-form">
                 <div class="form-row">
                     <div class="form-group">
@@ -570,7 +677,7 @@ function createOutputForm(inputs) {
                         <input type="text" class="form-control" id="output-url" placeholder="srt://example.com:9000" required>
                     </div>
                 </div>
-                <button type="submit" class="btn btn-success">${t('common.add')} ${t('nav.outputs').replace('📤 ', '').toLowerCase()}</button>
+                <button type="submit" class="btn btn-primary">${t('common.add')}</button>
             </form>
         </div>
     `;
@@ -604,36 +711,63 @@ function displayOutputsStatus(statuses) {
 
     const html = `
         <div class="form-group">
-            <h3>${t('outputs.management')} <small style="color: #6c757d;">(${t('common.updated')}: ${currentTime})</small></h3>
-            ${statuses.length === 0 ? `<p>${t('outputs.noActiveInputs')}</p>` : statuses.map(input => `
-                <div class="status-card">
-                    <h3>
-                        <span class="status-indicator ${input.active ? 'status-active' : 'status-inactive'}"></span>
-                        ${input.name}
-                    </h3>
-                    ${input.outputs && input.outputs.length > 0 ? input.outputs.map(output => `
-                        <div class="output-item">
-                            <div class="output-info">
-                                <div class="output-url">${output.url}</div>
-                                <div class="output-stats">
-                                    ${t('common.status')}: <span style="color: ${output.active ? '#27ae60' : '#e74c3c'}; font-weight: bold;">${output.active ? t('common.active') : t('common.inactive')}</span> | 
-                                    ${t('common.bitrate')}: <strong>${(output.bitrate_kbps || 0).toFixed(1)} kbps</strong> | 
-                                    ${t('common.uptime')}: <strong>${output.uptime || '00:00:00'}</strong> | 
-                                    ${t('common.errors')}: <strong>${output.error_count || 0}</strong>
-                                </div>
-                            </div>
-                            <div class="output-actions">
-                                <button class="btn btn-warning btn-small" onclick="reconnectOutput('${input.name}', '${output.url}')" title="${t('common.reconnect')}">
-                                    🔄
-                                </button>
-                                <button class="btn btn-danger btn-small" onclick="removeOutput('${input.name}', '${output.url}')" title="${t('common.remove')}">
-                                    🗑️
-                                </button>
+            <h3 style="margin-bottom: 20px;">${t('outputs.management')} <small style="color: var(--text-secondary); font-size: 0.8rem; font-weight: 500;">(${t('common.updated')}: ${currentTime})</small></h3>
+            ${statuses.length === 0 ? `<p>${t('outputs.noActiveInputs')}</p>` : statuses.map(input => {
+                const lowerName = input.name.toLowerCase();
+                let proto = 'RTMP';
+                if (lowerName.includes('whip') || input.url_path.includes('/whip')) {
+                    proto = 'WHIP';
+                } else if (lowerName.includes('srt') || input.url_path.includes('srt:')) {
+                    proto = 'SRT';
+                }
+                const protoClass = proto === 'WHIP' ? 'badge-whip' : (proto === 'SRT' ? 'badge-srt' : 'badge-protocol');
+
+                return `
+                    <div class="status-card">
+                        <div class="card-header">
+                            <h3>${input.name}</h3>
+                            <div class="card-badges">
+                                <span class="badge ${protoClass}">${proto}</span>
+                                <span class="badge ${input.active ? 'badge-active' : 'badge-inactive'}">
+                                    ${input.active ? t('common.active') : t('common.inactive')}
+                                </span>
                             </div>
                         </div>
-                    `).join('') : `<p>${t('status.noOutputs')}</p>`}
-                </div>
-            `).join('')}
+                        ${input.outputs && input.outputs.length > 0 ? input.outputs.map(output => `
+                            <div class="output-item">
+                                <div class="output-info">
+                                    <div class="output-url">${output.url}</div>
+                                    <div class="output-meta-pills">
+                                        <span class="meta-pill ${output.active ? 'active' : 'inactive'}">
+                                            ${output.active ? t('common.active') : t('common.inactive')}
+                                        </span>
+                                        <span class="meta-pill">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 2px;"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+                                            <strong>${(output.bitrate_kbps || 0).toFixed(1)}</strong> kbps
+                                        </span>
+                                        <span class="meta-pill">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 2px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                            <strong>${output.uptime || '00:00:00'}</strong>
+                                        </span>
+                                        <span class="meta-pill" style="${output.error_count > 0 ? 'color: var(--danger-color); background: var(--danger-light);' : ''}">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 2px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                                            <strong>${output.error_count || 0}</strong>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="output-actions">
+                                    <button class="btn btn-warning btn-small" onclick="reconnectOutput('${input.name}', '${output.url}')" title="${t('common.reconnect')}">
+                                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                    </button>
+                                    <button class="btn btn-danger btn-small" onclick="removeOutput('${input.name}', '${output.url}')" title="${t('common.remove')}">
+                                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('') : `<div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 16px;">${t('status.noOutputs')}</div>`}
+                    </div>
+                `;
+            }).join('')}
         </div>
     `;
 
@@ -710,6 +844,52 @@ async function reconnectOutput(inputName, url) {
     }
 }
 
+
+// Добавление выхода inline из карточки потока
+async function addOutputInline(event, inputName) {
+    event.preventDefault();
+    const form = event.target;
+    const input = form.querySelector('input');
+    const url = input.value.trim();
+    if (!url) return;
+
+    try {
+        await apiRequest('/outputs/add', {
+            method: 'POST',
+            body: JSON.stringify({
+                name: inputName,
+                url: url
+            })
+        });
+
+        showSuccess(t('outputs.addSuccess'));
+        input.value = '';
+        loadStatus();
+    } catch (error) {
+        showError(t('outputs.addError') + ': ' + error.message);
+    }
+}
+
+// Удаление выхода inline из карточки потока
+async function removeOutputInline(inputName, url) {
+    if (!confirm(`${t('outputs.removeConfirm')} "${url}"?`)) return;
+
+    try {
+        await apiRequest('/outputs/remove', {
+            method: 'POST',
+            body: JSON.stringify({
+                name: inputName,
+                url: url
+            })
+        });
+
+        showSuccess(t('outputs.removeSuccess'));
+        loadStatus();
+    } catch (error) {
+        showError(t('outputs.removeError') + ': ' + error.message);
+    }
+}
+
 // Загрузка настроек
 async function loadSettings() {
     try {
@@ -726,8 +906,10 @@ function displaySettings(settings) {
 
     const html = `
         <form id="settings-form">
-            <div class="form-group">
-                <h3>${t('settings.srt')}</h3>
+            <div class="status-card proto-srt">
+                <div class="card-header">
+                    <h3>${t('settings.srt')}</h3>
+                </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label>${t('settings.latency')}</label>
@@ -750,32 +932,30 @@ function displaySettings(settings) {
                 </div>
             </div>
             
-            <div class="form-group">
-                <h3>${t('settings.logging')}</h3>
+            <div class="status-card proto-rtmp">
+                <div class="card-header">
+                    <h3>${t('settings.logging')} & ${t('settings.reconnectInterval')}</h3>
+                </div>
                 <div class="form-row">
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="log-to-file" ${settings.LogToFile || settings.log_to_file ? 'checked' : ''}>
-                            ${t('settings.logToFile')}
-                        </label>
-                    </div>
                     <div class="form-group">
                         <label>${t('settings.logFile')}</label>
                         <input type="text" class="form-control" id="log-file" value="${settings.LogFile || settings.log_file || 'server.log'}">
                     </div>
+                    <div class="form-group">
+                        <label>${t('settings.reconnectIntervalLabel')}</label>
+                        <input type="number" class="form-control" id="reconnect-interval" value="${settings.ReconnectInterval || settings.reconnect_interval || 5}" min="1">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top: 10px;">
+                    <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="log-to-file" ${settings.LogToFile || settings.log_to_file ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: var(--accent-color);">
+                        ${t('settings.logToFile')}
+                    </label>
                 </div>
             </div>
             
-            <div class="form-group">
-                <h3>${t('settings.reconnectInterval')}</h3>
-                <div class="form-group">
-                    <label>${t('settings.reconnectIntervalLabel')}</label>
-                    <input type="number" class="form-control" id="reconnect-interval" value="${settings.ReconnectInterval || settings.reconnect_interval || 5}" min="1">
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <button type="submit" class="btn btn-success">${t('common.save')}</button>
+            <div style="display: flex; gap: 12px; margin-top: 24px;">
+                <button type="submit" class="btn btn-primary">${t('common.save')}</button>
                 <button type="button" class="btn btn-warning" onclick="reloadSettings()">${t('settings.reload')}</button>
             </div>
         </form>
