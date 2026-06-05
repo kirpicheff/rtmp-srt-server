@@ -268,6 +268,7 @@ func (s *SRTServer) handleConnection(conn srt.Conn) {
 		default:
 		}
 
+		conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 		n, err := conn.Read(buffer)
 		if err != nil {
 			if err == io.EOF {
@@ -359,7 +360,11 @@ func (s *SRTServer) handleSRTOutput(inputName, outputURL string, dataCh <-chan [
 			log.Printf("[SRT] Failed to connect to SRT output %s: %v", outputURL, err)
 			s.manager.SetOutputActive(inputName, outputURL, false)
 			s.manager.IncrementOutputError(inputName, outputURL)
-			time.Sleep(5 * time.Second)
+			select {
+			case <-stopCh:
+				return
+			case <-time.After(5 * time.Second):
+			}
 			continue
 		}
 
@@ -427,7 +432,11 @@ func (s *SRTServer) handleRTMPOutput(inputName, outputURL string, dataCh <-chan 
 			log.Printf("[SRT] RTMP Dial error for %s: %v", outputURL, err)
 			s.manager.SetOutputActive(inputName, outputURL, false)
 			s.manager.IncrementOutputError(inputName, outputURL)
-			time.Sleep(time.Duration(reconnectInterval) * time.Second)
+			select {
+			case <-stopCh:
+				return
+			case <-time.After(time.Duration(reconnectInterval) * time.Second):
+			}
 			continue
 		}
 		s.manager.SetOutputActive(inputName, outputURL, true)
@@ -484,6 +493,7 @@ func (s *SRTServer) processRTMPStream(reader io.Reader, dstConn *rtmp.Conn, inpu
 	var audioCodecData av.AudioCodecData
 	var streams []av.CodecData
 	var flvHeaderWritten bool
+	detectStart := time.Now()
 
 	var baseTime time.Duration
 	var baseTimeSet bool
@@ -566,9 +576,17 @@ func (s *SRTServer) processRTMPStream(reader io.Reader, dstConn *rtmp.Conn, inpu
 				}
 			}
 
-			// 4. Write Header when both video and audio codecs are ready
-			if videoCodecData != nil && audioCodecData != nil {
-				streams = []av.CodecData{videoCodecData, audioCodecData}
+			// 4. Записываем заголовок, когда готовы оба кодека ИЛИ после таймаута в 3 секунды при наличии хотя бы одного
+			hasVideo := videoCodecData != nil
+			hasAudio := audioCodecData != nil
+			if (hasVideo && hasAudio) || (time.Since(detectStart) > 3*time.Second && (hasVideo || hasAudio)) {
+				if hasVideo && hasAudio {
+					streams = []av.CodecData{videoCodecData, audioCodecData}
+				} else if hasVideo {
+					streams = []av.CodecData{videoCodecData}
+				} else {
+					streams = []av.CodecData{audioCodecData}
+				}
 				if err := dstConn.WriteHeader(streams); err != nil {
 					return fmt.Errorf("failed to write RTMP header: %w", err)
 				}

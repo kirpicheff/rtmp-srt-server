@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -154,7 +155,25 @@ func (w *WHIPServer) handleWHIP(wr http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{})
+	webrtcCfg := webrtc.Configuration{}
+	w.manager.mu.RLock()
+	var iceServers []string
+	if w.manager.config != nil {
+		iceServers = w.manager.config.WHIPSettings.ICEServers
+	}
+	w.manager.mu.RUnlock()
+
+	if len(iceServers) > 0 {
+		var webrtcICEServers []webrtc.ICEServer
+		for _, server := range iceServers {
+			webrtcICEServers = append(webrtcICEServers, webrtc.ICEServer{
+				URLs: []string{server},
+			})
+		}
+		webrtcCfg.ICEServers = webrtcICEServers
+	}
+
+	peerConnection, err := webrtc.NewPeerConnection(webrtcCfg)
 	if err != nil {
 		http.Error(wr, "Failed to create PeerConnection", http.StatusInternalServerError)
 		return
@@ -283,7 +302,7 @@ func (w *WHIPServer) startFFmpegPipeline(session *WHIPSession, inputCfg *InputCf
 		return
 	}
 
-	session.combinedSdpFilename = fmt.Sprintf("whip_combined_%s_%d.sdp", session.inputName, time.Now().UnixNano())
+	session.combinedSdpFilename = filepath.Join(os.TempDir(), fmt.Sprintf("whip_combined_%s_%d.sdp", session.inputName, time.Now().UnixNano()))
 
 	// Создаём единый SDP файл для видео и аудио, чтобы ffmpeg понимал, что они связаны
 	combinedSdpContent := []byte(fmt.Sprintf(
@@ -324,7 +343,11 @@ func (w *WHIPServer) startFFmpegPipeline(session *WHIPSession, inputCfg *InputCf
 		args = append(args, "-f", "flv", "pipe:1")
 	}
 
-	session.ffmpegCmd = exec.Command("./bin/ffmpeg.exe", args...)
+	ffmpegPath := "ffmpeg"
+	if _, err := os.Stat("./bin/ffmpeg.exe"); err == nil {
+		ffmpegPath = "./bin/ffmpeg.exe"
+	}
+	session.ffmpegCmd = exec.Command(ffmpegPath, args...)
 
 	// Создаём UDP соединение для видео
 	videoAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("127.0.0.1:%d", videoUDPPort))

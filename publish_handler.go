@@ -242,7 +242,11 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 							sm.mu.RLock()
 							reconnectInterval := sm.config.ReconnectInterval
 							sm.mu.RUnlock()
-							time.Sleep(time.Duration(reconnectInterval) * time.Second)
+							select {
+							case <-stop:
+								return
+							case <-time.After(time.Duration(reconnectInterval) * time.Second):
+							}
 							continue
 						}
 						sm.SetOutputActive(inputCfg.Name, url, true)
@@ -255,7 +259,11 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 							sm.mu.RLock()
 							reconnectInterval := sm.config.ReconnectInterval
 							sm.mu.RUnlock()
-							time.Sleep(time.Duration(reconnectInterval) * time.Second)
+							select {
+							case <-stop:
+								return
+							case <-time.After(time.Duration(reconnectInterval) * time.Second):
+							}
 							continue
 						}
 					rtmpLoop:
@@ -290,7 +298,11 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 										sm.mu.RLock()
 										reconnectInterval := sm.config.ReconnectInterval
 										sm.mu.RUnlock()
-										time.Sleep(time.Duration(reconnectInterval) * time.Second)
+										select {
+										case <-stop:
+											return
+										case <-time.After(time.Duration(reconnectInterval) * time.Second):
+										}
 										break rtmpLoop
 									}
 								case <-time.After(5 * time.Second):
@@ -301,7 +313,11 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 									sm.mu.RLock()
 									reconnectInterval := sm.config.ReconnectInterval
 									sm.mu.RUnlock()
-									time.Sleep(time.Duration(reconnectInterval) * time.Second)
+									select {
+									case <-stop:
+										return
+									case <-time.After(time.Duration(reconnectInterval) * time.Second):
+									}
 									break rtmpLoop
 								}
 
@@ -342,7 +358,11 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 						conn, err := srt.Dial("srt", srtAddr, cfgSRT)
 						if err != nil {
 							log.Printf("Failed to connect to SRT %s: %v", url, err)
-							time.Sleep(time.Duration(reconnectInterval) * time.Second)
+							select {
+							case <-stop:
+								return
+							case <-time.After(time.Duration(reconnectInterval) * time.Second):
+							}
 							continue
 						}
 
@@ -360,7 +380,11 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 							log.Printf("TS WriteHeader error for %s: %v", url, err)
 							conn.Close()
 							sm.SetOutputActive(inputCfg.Name, url, false)
-							time.Sleep(time.Duration(reconnectInterval) * time.Second)
+							select {
+							case <-stop:
+								return
+							case <-time.After(time.Duration(reconnectInterval) * time.Second):
+							}
 							continue
 						}
 
@@ -372,7 +396,11 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 								log.Printf("SRT Write header error for %s: %v", url, err)
 								conn.Close()
 								sm.SetOutputActive(inputCfg.Name, url, false)
-								time.Sleep(time.Duration(reconnectInterval) * time.Second)
+								select {
+								case <-stop:
+									return
+								case <-time.After(time.Duration(reconnectInterval) * time.Second):
+								}
 								continue
 							}
 							totalBytes += int64(len(headerData))
@@ -450,7 +478,11 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 
 											conn.Close()
 											sm.SetOutputActive(inputCfg.Name, url, false)
-											time.Sleep(time.Duration(reconnectInterval) * time.Second)
+											select {
+											case <-stop:
+												return
+											case <-time.After(time.Duration(reconnectInterval) * time.Second):
+											}
 											break srtLoop
 										}
 
@@ -472,7 +504,11 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 										log.Printf("[ERROR] SRT write timeout for %s - forcing reconnect", url)
 										conn.Close()
 										sm.SetOutputActive(inputCfg.Name, url, false)
-										time.Sleep(time.Duration(reconnectInterval) * time.Second)
+										select {
+										case <-stop:
+											return
+										case <-time.After(time.Duration(reconnectInterval) * time.Second):
+										}
 										break srtLoop
 									}
 								} else {

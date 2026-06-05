@@ -26,6 +26,10 @@ type ServerConfig struct {
 	APIAuthPassword string `yaml:"api_password"`
 }
 
+type WHIPSettings struct {
+	ICEServers []string `yaml:"ice_servers"`
+}
+
 type Config struct {
 	Server            ServerConfig `yaml:"server"`
 	SRTPort           int          `yaml:"srt_port"`
@@ -36,6 +40,7 @@ type Config struct {
 	APIAuthUser       string       `yaml:"api_auth_user" json:"-"`
 	APIAuthPassword   string       `yaml:"api_auth_password" json:"-"`
 	SRTSettings       SRTSettings  `yaml:"srt_settings"`
+	WHIPSettings      WHIPSettings `yaml:"whip_settings"`
 }
 
 type InputCfg struct {
