@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"encoding/base64"
 	"encoding/json"
 	"log"
@@ -11,6 +12,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 )
+
+//go:embed web/*
+var webFS embed.FS
 
 type APIServer struct {
 	SM       *StreamManager
@@ -538,13 +542,13 @@ func (api *APIServer) handleWebInterface(w http.ResponseWriter, r *http.Request)
 		path = "/index.html"
 	}
 
-	// Читаем файл из папки web
+	// Читаем файл из встроенной папки web
 	filePath := "web" + path
-	data, err := os.ReadFile(filePath)
+	data, err := webFS.ReadFile(filePath)
 	if err != nil {
 		// Если файл не найден, возвращаем index.html
 		if path != "/index.html" {
-			data, err = os.ReadFile("web/index.html")
+			data, err = webFS.ReadFile("web/index.html")
 			if err != nil {
 				http.NotFound(w, r)
 				return

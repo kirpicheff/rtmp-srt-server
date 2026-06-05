@@ -332,8 +332,22 @@ flowchart LR
     D --> G
 ```
 
-### Требования к ffmpeg
-Для работы WHIP необходим ffmpeg, собранный с поддержкой следующих опций:
+### ffmpeg Requirements
+
+To use WHIP or record streams in MP4 format, `ffmpeg` must be installed. The server automatically searches for `ffmpeg` in your system `PATH`.
+
+**How to get ffmpeg without building it yourself:**
+* **Windows**: Download a pre-built package (e.g., `ffmpeg-git-essentials.7z`) from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) and extract `ffmpeg.exe` into the `bin/` folder inside the server directory:
+  ```
+  go project/
+  ├── bin/
+  │   └── ffmpeg.exe
+  └── ...
+  ```
+* **macOS**: Install via Homebrew (`brew install ffmpeg`).
+* **Linux**: Install via package manager (`sudo apt install ffmpeg` or `sudo pacman -S ffmpeg`).
+
+*(The custom build options below are optional and only needed if you want to compile a minimal custom binary yourself)*
 
 ```
 --prefix=/mingw64
@@ -747,17 +761,22 @@ go project/
   ```
 
 > **Важно:**
-> Для работы WHIP (и других функций, использующих ffmpeg) требуется наличие утилиты `ffmpeg` в системе.
+> Для работы WHIP и записи видео в формате MP4 требуется наличие утилиты `ffmpeg` в системе.
 > Программа автоматически ищет `ffmpeg` в глобальных системных путях (переменная окружения `PATH`).
 >
-> Если вы работаете на Windows и хотите использовать локальный исполняемый файл, вы можете поместить `ffmpeg.exe` в подпапку `bin` внутри директории с программой:
+> **Как установить готовый ffmpeg без ручной сборки:**
+> * **Windows**: скачайте готовую сборку (например, `ffmpeg-git-essentials.7z`) с сайта [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) и распакуйте файл `ffmpeg.exe` в подпапку `bin` внутри директории с программой:
 >
-> ```
-> go project/
-> ├── bin/
-> │   └── ffmpeg.exe
-> └── ...
-> ```
+>   ```
+>   go project/
+>   ├── bin/
+>   │   └── ffmpeg.exe
+>   └── ...
+>   ```
+> * **macOS**: установите через Homebrew (`brew install ffmpeg`).
+> * **Linux**: установите стандартный пакет через ваш менеджер пакетов (`sudo apt install ffmpeg` или `sudo pacman -S ffmpeg`).
+>
+> *(Указанные ниже опции сборки требуются только если вы хотите собрать максимально легковесный бинарник вручную)*
 
 ## TS Muxer Fixes
 

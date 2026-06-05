@@ -91,7 +91,44 @@ const translations = {
         'settings.saveError': 'Ошибка сохранения настроек',
         'settings.reloadError': 'Ошибка перезагрузки настроек',
         'settings.loadError': 'Ошибка загрузки настроек',
-        'settings.reload': 'Перезагрузить из файла'
+        'settings.reload': 'Перезагрузить из файла',
+
+        // Навигация - Помощь
+        'nav.help': 'Помощь',
+
+        // Помощь
+        'help.title': 'Справка и руководство',
+        'help.quickstart.title': 'Быстрый старт',
+        'help.quickstart.body': 'Сервер работает как медиа-шлюз: принимает поток по одному протоколу (RTMP, SRT, WHIP) и одновременно транслирует его на несколько выходов (другие серверы, файлы). Не требует перекодирования — потоки передаются без изменений (copy).',
+        'help.inputs.title': 'Как добавить вход',
+        'help.inputs.body': 'Перейдите во вкладку «Добавить вход». Заполните поля:',
+        'help.inputs.field1': 'Имя — произвольный идентификатор входа (например: <code>obs</code>, <code>camera1</code>).',
+        'help.inputs.field2': 'Путь — RTMP-путь, по которому encoder будет публиковать поток. Пример: <code>/live/stream</code>.',
+        'help.inputs.field3': 'Выходы — список URL для ретрансляции (по одному на строку). Можно оставить пустым и добавить позже прямо с Дашборда.',
+        'help.inputs.note': 'Вход можно создать до того, как encoder подключится. Статус «Неактивен» — норма при отсутствии публикующего потока.',
+        'help.protocols.title': 'Поддерживаемые протоколы входа',
+        'help.protocols.rtmp': '<b>RTMP</b> — стандартный протокол. Укажите путь в настройках OBS или другого encoder-а. Порт по умолчанию: <code>1935</code>.',
+        'help.protocols.srt': '<b>SRT</b> — надёжный UDP-протокол для нестабильных сетей. Укажите адрес сервера и порт в encoder-е. Порт по умолчанию: <code>4000</code> (настраивается в конфиге).',
+        'help.protocols.whip': '<b>WHIP</b> — WebRTC-протокол. Используется из браузерных encoder-ов. Endpoint: <code>/whip/&lt;path&gt;</code>.',
+        'help.outputs.title': 'Как добавить выход',
+        'help.outputs.body': 'Выход можно добавить двумя способами:',
+        'help.outputs.way1': '<b>На Дашборде</b> — прямо в карточке потока введите URL в поле и нажмите «Добавить». Выход активируется немедленно.',
+        'help.outputs.way2': '<b>При создании входа</b> — укажите список URL в поле «Выходы» при добавлении нового входа.',
+        'help.outputs.formats': 'Примеры поддерживаемых форматов выходов:',
+        'help.outputs.ex.rtmp': 'Ретрансляция на RTMP-сервер (YouTube, Twitch и др.)',
+        'help.outputs.ex.srt': 'Ретрансляция по SRT',
+        'help.outputs.ex.flv': 'Запись в файл FLV (требует ffmpeg в PATH или bin/)',
+        'help.outputs.ex.mp4': 'Запись в файл MP4 (требует ffmpeg в PATH или bin/)',
+        'help.outputs.mp4note': 'Для записи в файл необходим ffmpeg. Подробнее — в разделе «ffmpeg» ниже.',
+        'help.ffmpeg.title': 'ffmpeg для записи файлов',
+        'help.ffmpeg.body': 'Запись в FLV/MP4 использует ffmpeg как внешний процесс (stdin pipe). Бинарный файл ffmpeg должен находиться в папке <code>bin/</code> рядом с сервером или быть доступен в системном PATH.',
+        'help.ffmpeg.windows': 'Windows: скачайте готовую сборку с <b>gyan.dev</b> (раздел <i>release builds → essentials</i>). Разархивируйте, скопируйте <code>ffmpeg.exe</code> в папку <code>bin/</code>.',
+        'help.ffmpeg.linux': 'Linux: установите через пакетный менеджер (<code>apt install ffmpeg</code>) или скачайте статический бинарник.',
+        'help.ffmpeg.custom': 'Для работы WHIP требуется ffmpeg с поддержкой <code>libfdk_aac</code>. Стандартные сборки (gyan.dev essentials) этот кодек содержат.',
+        'help.reconnect.title': 'Реконнект выходов',
+        'help.reconnect.body': 'Если выход потерял соединение, он автоматически переподключается через интервал, заданный в Настройках. Принудительный реконнект доступен кнопкой на Дашборде (иконка «стрелки»). Это полезно, если приёмник перезапустился.',
+        'help.config.title': 'Файл конфигурации',
+        'help.config.body': 'Настройки хранятся в файле <code>config.json</code> рядом с бинарным файлом сервера. Изменения через веб-интерфейс сохраняются в этот файл автоматически. Ручное редактирование также поддерживается — нажмите «Перезагрузить из файла» в разделе Настройки после правки вручную.'
     },
     en: {
         // Header
@@ -184,7 +221,44 @@ const translations = {
         'settings.saveError': 'Error saving settings',
         'settings.reloadError': 'Error reloading settings',
         'settings.loadError': 'Error loading settings',
-        'settings.reload': 'Reload from file'
+        'settings.reload': 'Reload from file',
+
+        // Navigation - Help
+        'nav.help': 'Help',
+
+        // Help
+        'help.title': 'Help & Guide',
+        'help.quickstart.title': 'Quick Start',
+        'help.quickstart.body': 'The server works as a media gateway: it receives a stream via one protocol (RTMP, SRT, WHIP) and simultaneously relays it to multiple outputs (other servers, files). No transcoding required — streams are passed through without modification (copy).',
+        'help.inputs.title': 'How to Add an Input',
+        'help.inputs.body': 'Go to the «Add Input» tab. Fill in the fields:',
+        'help.inputs.field1': 'Name — any identifier for the input (e.g. <code>obs</code>, <code>camera1</code>).',
+        'help.inputs.field2': 'Path — the RTMP path your encoder will publish to. Example: <code>/live/stream</code>.',
+        'help.inputs.field3': 'Outputs — list of destination URLs (one per line). Can be left empty and added later directly from the Dashboard.',
+        'help.inputs.note': 'An input can be created before the encoder connects. Status «Inactive» is normal when no stream is being published.',
+        'help.protocols.title': 'Supported Input Protocols',
+        'help.protocols.rtmp': '<b>RTMP</b> — standard protocol. Enter the server address and path in OBS or another encoder. Default port: <code>1935</code>.',
+        'help.protocols.srt': '<b>SRT</b> — reliable UDP protocol for unstable networks. Enter the server address and port in your encoder. Default port: <code>4000</code> (configurable).',
+        'help.protocols.whip': '<b>WHIP</b> — WebRTC-based protocol. Used with browser-based encoders. Endpoint: <code>/whip/&lt;path&gt;</code>.',
+        'help.outputs.title': 'How to Add an Output',
+        'help.outputs.body': 'Outputs can be added in two ways:',
+        'help.outputs.way1': '<b>On the Dashboard</b> — enter the URL directly in the stream card and click «Add». The output activates immediately.',
+        'help.outputs.way2': '<b>When creating an input</b> — specify a list of URLs in the «Outputs» field when adding a new input.',
+        'help.outputs.formats': 'Examples of supported output formats:',
+        'help.outputs.ex.rtmp': 'Relay to RTMP server (YouTube, Twitch, etc.)',
+        'help.outputs.ex.srt': 'Relay via SRT',
+        'help.outputs.ex.flv': 'Record to FLV file (requires ffmpeg in PATH or bin/)',
+        'help.outputs.ex.mp4': 'Record to MP4 file (requires ffmpeg in PATH or bin/)',
+        'help.outputs.mp4note': 'File recording requires ffmpeg. See the «ffmpeg» section below.',
+        'help.ffmpeg.title': 'ffmpeg for File Recording',
+        'help.ffmpeg.body': 'Recording to FLV/MP4 uses ffmpeg as an external process (stdin pipe). The ffmpeg binary must be located in the <code>bin/</code> folder next to the server, or be available in the system PATH.',
+        'help.ffmpeg.windows': 'Windows: download a pre-built binary from <b>gyan.dev</b> (section <i>release builds → essentials</i>). Extract and copy <code>ffmpeg.exe</code> into the <code>bin/</code> folder.',
+        'help.ffmpeg.linux': 'Linux: install via package manager (<code>apt install ffmpeg</code>) or download a static binary.',
+        'help.ffmpeg.custom': 'WHIP recording requires ffmpeg built with <code>libfdk_aac</code> support. Standard builds from gyan.dev (essentials) include this codec.',
+        'help.reconnect.title': 'Output Reconnection',
+        'help.reconnect.body': 'If an output loses its connection, it will automatically reconnect after the interval set in Settings. A manual reconnect is available via the button on the Dashboard (arrow icon). Useful when the receiving server restarts.',
+        'help.config.title': 'Configuration File',
+        'help.config.body': 'Settings are stored in <code>config.json</code> next to the server binary. Changes made via the web interface are saved to this file automatically. Manual editing is also supported — click «Reload from file» in the Settings tab after editing manually.'
     }
 };
 
@@ -295,6 +369,9 @@ function loadCurrentTab() {
             break;
         case 'settings':
             loadSettings();
+            break;
+        case 'help':
+            loadHelp();
             break;
     }
 }
@@ -1005,6 +1082,94 @@ async function reloadSettings() {
     } catch (error) {
         showError(t('settings.reloadError') + ': ' + error.message);
     }
+}
+
+// Отображение раздела помощи
+function loadHelp() {
+    const container = document.getElementById('help-content');
+
+    // Вспомогательная функция для блока с кодом
+    function codeBlock(lines) {
+        return '<pre><code>' + lines.join('\n') + '</code></pre>';
+    }
+
+    container.innerHTML = `
+        <!-- Быстрый старт -->
+        <div class="help-card">
+            <h3>&#9654; ${t('help.quickstart.title')}</h3>
+            <p>${t('help.quickstart.body')}</p>
+        </div>
+
+        <!-- Входы -->
+        <div class="help-card">
+            <h3>&#43; ${t('help.inputs.title')}</h3>
+            <p>${t('help.inputs.body')}</p>
+            <ul>
+                <li>${t('help.inputs.field1')}</li>
+                <li>${t('help.inputs.field2')}</li>
+                <li>${t('help.inputs.field3')}</li>
+            </ul>
+            <p><span class="highlight">${t('help.inputs.note')}</span></p>
+        </div>
+
+        <!-- Протоколы входа -->
+        <div class="help-card">
+            <h3>&#128246; ${t('help.protocols.title')}</h3>
+            <ul>
+                <li>${t('help.protocols.rtmp')}</li>
+                <li>${t('help.protocols.srt')}</li>
+                <li>${t('help.protocols.whip')}</li>
+            </ul>
+        </div>
+
+        <!-- Выходы -->
+        <div class="help-card">
+            <h3>&#128640; ${t('help.outputs.title')}</h3>
+            <p>${t('help.outputs.body')}</p>
+            <ul>
+                <li>${t('help.outputs.way1')}</li>
+                <li>${t('help.outputs.way2')}</li>
+            </ul>
+            <p>${t('help.outputs.formats')}</p>
+            ${codeBlock([
+                'rtmp://a.rtmp.youtube.com/live2/xxxx-xxxx    # ' + t('help.outputs.ex.rtmp'),
+                'srt://relay.example.com:4000                 # ' + t('help.outputs.ex.srt'),
+                'file:///recordings/stream.flv                # ' + t('help.outputs.ex.flv'),
+                'file:///recordings/stream.mp4                # ' + t('help.outputs.ex.mp4'),
+            ])}
+            <p>${t('help.outputs.mp4note')}</p>
+        </div>
+
+        <!-- ffmpeg -->
+        <div class="help-card">
+            <h3>&#128250; ${t('help.ffmpeg.title')}</h3>
+            <p>${t('help.ffmpeg.body')}</p>
+            <ul>
+                <li>${t('help.ffmpeg.windows')}</li>
+                <li>${t('help.ffmpeg.linux')}</li>
+                <li>${t('help.ffmpeg.custom')}</li>
+            </ul>
+            ${codeBlock([
+                '# Windows',
+                'bin\\ffmpeg.exe',
+                '',
+                '# Linux / macOS',
+                'bin/ffmpeg',
+            ])}
+        </div>
+
+        <!-- Реконнект -->
+        <div class="help-card">
+            <h3>&#128257; ${t('help.reconnect.title')}</h3>
+            <p>${t('help.reconnect.body')}</p>
+        </div>
+
+        <!-- Конфиг -->
+        <div class="help-card">
+            <h3>&#9881; ${t('help.config.title')}</h3>
+            <p>${t('help.config.body')}</p>
+        </div>
+    `;
 }
 
 // Показ уведомлений

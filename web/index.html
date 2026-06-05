@@ -686,6 +686,84 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* Help & Guide Styles */
+        .help-section {
+            margin-bottom: 30px;
+        }
+
+        .help-card {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        }
+
+        .help-card h3 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .help-card p {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            line-height: 1.6;
+        }
+
+        .help-card ul {
+            margin-left: 20px;
+            margin-bottom: 16px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .help-card li {
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+
+        .help-card pre {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.8rem;
+            overflow-x: auto;
+            margin-bottom: 16px;
+            border: 1px solid #1e293b;
+        }
+
+        .help-card code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            background: #f1f5f9;
+            color: #0f172a;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .help-card pre code {
+            background: transparent;
+            color: inherit;
+            padding: 0;
+            border-radius: 0;
+            font-weight: inherit;
+        }
+
+        .help-card .highlight {
+            font-weight: 600;
+            color: var(--accent-color);
+        }
     </style>
 </head>
 
@@ -700,6 +778,7 @@
                 <div class="nav-tab active" data-tab="status" data-i18n="nav.status">Дашборд</div>
                 <div class="nav-tab" data-tab="inputs" data-i18n="nav.inputs">Добавить вход</div>
                 <div class="nav-tab" data-tab="settings" data-i18n="nav.settings">Настройки</div>
+                <div class="nav-tab" data-tab="help" data-i18n="nav.help">Помощь</div>
             </div>
             <div class="sidebar-footer">
                 <div class="language-switcher">
@@ -735,6 +814,12 @@
                     <div id="settings-content" class="loading" data-i18n="common.loading">
                         Загрузка...
                     </div>
+                </div>
+
+                <!-- Помощь -->
+                <div id="help" class="tab-content">
+                    <h2 data-i18n="help.title">Справка и руководство</h2>
+                    <div id="help-content"></div>
                 </div>
             </div>
         </div>
