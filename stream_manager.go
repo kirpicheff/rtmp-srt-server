@@ -154,6 +154,19 @@ func (sm *StreamManager) GetInputByName(name string) *InputCfg {
 	return nil
 }
 
+func (sm *StreamManager) GetInputOutputs(name string) []string {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	input, ok := sm.inputs[name]
+	if !ok || input == nil {
+		return nil
+	}
+	outputs := make([]string, len(input.Outputs))
+	copy(outputs, input.Outputs)
+	return outputs
+}
+
+
 func (sm *StreamManager) SetStatusActive(name string, active bool) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()

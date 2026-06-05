@@ -61,6 +61,9 @@ func (s *SRTServer) Start() error {
 			return srt.PUBLISH
 		},
 		HandlePublish: func(conn srt.Conn) {
+			s.mu.Lock()
+			s.connections[conn.RemoteAddr().String()] = conn
+			s.mu.Unlock()
 			s.wg.Add(1)
 			go s.handleConnection(conn)
 		},
@@ -112,8 +115,13 @@ func (s *SRTServer) Stop() error {
 }
 
 func (s *SRTServer) handleConnection(conn srt.Conn) {
-	defer s.wg.Done()
-	defer conn.Close()
+	defer func() {
+		s.mu.Lock()
+		delete(s.connections, conn.RemoteAddr().String())
+		s.mu.Unlock()
+		s.wg.Done()
+		conn.Close()
+	}()
 
 	streamID := conn.StreamId()
 	inputName := "obs"
@@ -138,7 +146,7 @@ func (s *SRTServer) handleConnection(conn srt.Conn) {
 
 	// Находим SRT и RTMP выходы
 	var srtOutputs, rtmpOutputs, fileOutputs []string
-	for _, output := range inputCfg.Outputs {
+	for _, output := range s.manager.GetInputOutputs(inputName) {
 		if strings.HasPrefix(output, "srt://") {
 			srtOutputs = append(srtOutputs, output)
 		} else if strings.HasPrefix(output, "rtmp://") {
@@ -224,7 +232,7 @@ func (s *SRTServer) handleConnection(conn srt.Conn) {
 			case <-updateTicker.C:
 				// Получаем актуальный список выходов
 				currentOutputs := make(map[string]struct{})
-				for _, url := range inputCfg.Outputs {
+				for _, url := range s.manager.GetInputOutputs(inputName) {
 					if strings.HasPrefix(url, "srt://") || strings.HasPrefix(url, "rtmp://") || strings.HasPrefix(url, "file://") {
 						currentOutputs[url] = struct{}{}
 						s.manager.RegisterOutput(inputName, url)
@@ -643,8 +651,12 @@ func (s *SRTServer) processRTMPStream(reader io.Reader, dstConn *rtmp.Conn, inpu
 			}
 			lastAudioTime = pkt.Time
 			// Strip ADTS header from audio packet
-			if len(pkt.Data) > 7 {
-				pkt.Data = pkt.Data[7:]
+			headerLen := 7
+			if len(pkt.Data) > 1 && (pkt.Data[1]&0x01) == 0 {
+				headerLen = 9
+			}
+			if len(pkt.Data) > headerLen {
+				pkt.Data = pkt.Data[headerLen:]
 			}
 		}
 
