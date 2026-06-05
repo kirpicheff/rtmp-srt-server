@@ -88,8 +88,9 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 		}
 		log.Printf("Matched input config: %s with %d outputs", inputCfg.Name, len(inputCfg.Outputs))
 
+		activeOutputsList := sm.GetInputOutputs(inputCfg.Name)
 		log.Printf("[DEBUG] Starting publish handling for input: %s", inputCfg.Name)
-		log.Printf("[DEBUG] Output URLs: %v", inputCfg.Outputs)
+		log.Printf("[DEBUG] Output URLs: %v", activeOutputsList)
 
 		sm.SetStatusActive(inputCfg.Name, true)
 		defer sm.SetStatusActive(inputCfg.Name, false)
@@ -127,7 +128,7 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 						activeOutputs++
 					}
 					log.Printf("[HEARTBEAT] Publish '%s' uptime: %v, Active outputs: %d/%d",
-						inputCfg.Name, uptime, activeOutputs, len(inputCfg.Outputs))
+						inputCfg.Name, uptime, activeOutputs, len(sm.GetInputOutputs(inputCfg.Name)))
 
 					// Проверяем состояние соединений
 					for url, w := range outputs {
@@ -487,7 +488,7 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 		}
 
 		// Инициализация выходов из inputCfg
-		for _, url := range inputCfg.Outputs {
+		for _, url := range sm.GetInputOutputs(inputCfg.Name) {
 			sm.RegisterOutput(inputCfg.Name, url)
 			outputMgr.AddOutput(url, bufSize, startPush(url))
 		}
@@ -508,7 +509,7 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 				case <-updateTicker.C:
 					// Синхронизируем выходы с inputCfg.Outputs
 					current := make(map[string]struct{})
-					for _, url := range inputCfg.Outputs {
+					for _, url := range sm.GetInputOutputs(inputCfg.Name) {
 						current[url] = struct{}{}
 						sm.RegisterOutput(inputCfg.Name, url)
 						outputMgr.AddOutput(url, bufSize, startPush(url))
@@ -580,7 +581,7 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 		log.Printf("Publish finished: %s", srcConn.URL)
 
 		// Сбрасываем статус всех выходов при завершении трансляции
-		for _, url := range inputCfg.Outputs {
+		for _, url := range sm.GetInputOutputs(inputCfg.Name) {
 			sm.SetOutputActive(inputCfg.Name, url, false)
 		}
 		// ЯВНО закрываем все выходные каналы, чтобы завершились все горутины записи
