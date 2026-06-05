@@ -3,8 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"io"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -172,21 +174,64 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 					if strings.HasPrefix(url, "file://") {
 						log.Printf("[DEBUG] Detected file output for URL: %s", url)
 						filename := strings.TrimPrefix(url, "file://")
-						log.Printf("[DEBUG] Creating file: %s", filename)
-						file, err := os.Create(filename)
-						if err != nil {
-							log.Printf("[ERROR] Failed to create file %s: %v", filename, err)
-							time.Sleep(5 * time.Second)
-							return
+						isMp4 := strings.HasSuffix(strings.ToLower(filename), ".mp4")
+
+						var ffmpegCmd *exec.Cmd
+						var writeCloser io.WriteCloser
+						var file *os.File
+						var muxer *flv.Muxer
+
+						if isMp4 {
+							ffmpegPath := "ffmpeg"
+							if _, err := os.Stat("./bin/ffmpeg.exe"); err == nil {
+								ffmpegPath = "./bin/ffmpeg.exe"
+							}
+							args := []string{
+								"-y",
+								"-f", "flv",
+								"-i", "pipe:0",
+								"-c", "copy",
+								"-movflags", "frag_keyframe+empty_moov",
+								filename,
+							}
+							ffmpegCmd = exec.Command(ffmpegPath, args...)
+							var err error
+							writeCloser, err = ffmpegCmd.StdinPipe()
+							if err != nil {
+								log.Printf("[ERROR] Failed to create ffmpeg stdin pipe for %s: %v", filename, err)
+								time.Sleep(5 * time.Second)
+								return
+							}
+							if err := ffmpegCmd.Start(); err != nil {
+								log.Printf("[ERROR] Failed to start ffmpeg for %s: %v", filename, err)
+								time.Sleep(5 * time.Second)
+								return
+							}
+							log.Printf("[DEBUG] Writing fragmented MP4 via ffmpeg to: %s", filename)
+							muxer = flv.NewMuxer(writeCloser)
+						} else {
+							log.Printf("[DEBUG] Creating file: %s", filename)
+							var err error
+							file, err = os.Create(filename)
+							if err != nil {
+								log.Printf("[ERROR] Failed to create file %s: %v", filename, err)
+								time.Sleep(5 * time.Second)
+								return
+							}
+							log.Printf("[DEBUG] Writing FLV directly to file: %s", filename)
+							muxer = flv.NewMuxer(file)
 						}
 
-						log.Printf("[DEBUG] Writing FLV to file: %s", filename)
 						sm.SetOutputActive(inputCfg.Name, url, true)
-						muxer := flv.NewMuxer(file)
 						err = muxer.WriteHeader(streams)
 						if err != nil {
-							log.Printf("[ERROR] Failed to write FLV header to file %s: %v", filename, err)
-							file.Close()
+							log.Printf("[ERROR] Failed to write header: %v", err)
+							if isMp4 {
+								writeCloser.Close()
+								ffmpegCmd.Process.Kill()
+							} else {
+								file.Close()
+							}
 							sm.SetOutputActive(inputCfg.Name, url, false)
 							time.Sleep(5 * time.Second)
 							return
@@ -197,29 +242,44 @@ func handlePublish(sm *StreamManager, cfg *Config) func(conn *rtmp.Conn) {
 							select {
 							case <-stop:
 								if err := muxer.WriteTrailer(); err != nil {
-									log.Printf("Failed to write FLV trailer to file %s: %v", filename, err)
+									log.Printf("Failed to write trailer: %v", err)
 								}
-								file.Close()
+								if isMp4 {
+									writeCloser.Close()
+									ffmpegCmd.Wait()
+								} else {
+									file.Close()
+								}
 								sm.SetOutputActive(inputCfg.Name, url, false)
 								log.Printf("File output stopped: %s", filename)
 								fileDone = true
 							case pkt, ok := <-ch:
 								if !ok {
 									if err := muxer.WriteTrailer(); err != nil {
-										log.Printf("Failed to write FLV trailer to file %s: %v", filename, err)
+										log.Printf("Failed to write trailer: %v", err)
 									}
-									file.Close()
+									if isMp4 {
+										writeCloser.Close()
+										ffmpegCmd.Wait()
+									} else {
+										file.Close()
+									}
 									sm.SetOutputActive(inputCfg.Name, url, false)
 									fileDone = true
 									break
 								}
 								err = muxer.WritePacket(pkt)
 								if err != nil {
-									log.Printf("Write error to file %s: %v", filename, err)
+									log.Printf("Write error to output: %v", err)
 									if err := muxer.WriteTrailer(); err != nil {
-										log.Printf("Failed to write FLV trailer to file %s: %v", filename, err)
+										log.Printf("Failed to write trailer: %v", err)
 									}
-									file.Close()
+									if isMp4 {
+										writeCloser.Close()
+										ffmpegCmd.Wait()
+									} else {
+										file.Close()
+									}
 									sm.SetOutputActive(inputCfg.Name, url, false)
 									time.Sleep(5 * time.Second)
 									fileDone = true

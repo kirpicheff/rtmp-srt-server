@@ -236,6 +236,9 @@ go project/
 ### Outputs
 - RTMP (rtmp://server/app/stream)
 - SRT (srt://server:port?streamid=...)
+- File recording:
+  - `.mp4` (fragmented MP4 via ffmpeg, zero CPU load, crash-resilient)
+  - `.flv` / `.ts` (raw stream saving)
 
 ## SRT Input/Output Examples
 
@@ -616,6 +619,9 @@ go project/
 ### Выходы
 - RTMP (rtmp://server/app/stream)
 - SRT (srt://server:port?streamid=...)
+- Запись в файл:
+  - `.mp4` (фрагментированный MP4 через ffmpeg, без нагрузки на CPU, устойчив к сбоям)
+  - `.flv` / `.ts` (сохранение сырого потока)
 
 ## Примеры SRT входа/выхода
 

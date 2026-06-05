@@ -16,6 +16,7 @@ import (
 	"github.com/datarhei/joy4/codec/aacparser"
 	"github.com/datarhei/joy4/codec/h264parser"
 	"github.com/datarhei/joy4/format/rtmp"
+	"os/exec"
 )
 
 type SRTServer struct {
@@ -692,15 +693,52 @@ func (s *SRTServer) handleFileOutput(inputName, outputURL string, dataCh <-chan 
 	defer s.wg.Done()
 
 	filePath := strings.TrimPrefix(outputURL, "file://")
-	file, err := os.Create(filePath)
-	if err != nil {
-		log.Printf("[SRT] Failed to create file %s: %v", filePath, err)
-		s.manager.SetOutputActive(inputName, outputURL, false)
-		return
-	}
-	defer file.Close()
+	isMp4 := strings.HasSuffix(strings.ToLower(filePath), ".mp4")
 
-	log.Printf("[SRT] Writing to file: %s", filePath)
+	var ffmpegCmd *exec.Cmd
+	var writeCloser io.WriteCloser
+	var file *os.File
+
+	if isMp4 {
+		ffmpegPath := "ffmpeg"
+		if _, err := os.Stat("./bin/ffmpeg.exe"); err == nil {
+			ffmpegPath = "./bin/ffmpeg.exe"
+		}
+		args := []string{
+			"-y",
+			"-f", "mpegts",
+			"-i", "pipe:0",
+			"-c", "copy",
+			"-movflags", "frag_keyframe+empty_moov",
+			filePath,
+		}
+		ffmpegCmd = exec.Command(ffmpegPath, args...)
+		var err error
+		writeCloser, err = ffmpegCmd.StdinPipe()
+		if err != nil {
+			log.Printf("[SRT] Failed to create ffmpeg stdin pipe for %s: %v", filePath, err)
+			s.manager.SetOutputActive(inputName, outputURL, false)
+			return
+		}
+		if err := ffmpegCmd.Start(); err != nil {
+			log.Printf("[SRT] Failed to start ffmpeg for %s: %v", filePath, err)
+			s.manager.SetOutputActive(inputName, outputURL, false)
+			return
+		}
+		log.Printf("[SRT] Writing fragmented MP4 via ffmpeg to: %s", filePath)
+	} else {
+		log.Printf("[SRT] Creating file: %s", filePath)
+		var err error
+		file, err = os.Create(filePath)
+		if err != nil {
+			log.Printf("[SRT] Failed to create file %s: %v", filePath, err)
+			s.manager.SetOutputActive(inputName, outputURL, false)
+			return
+		}
+		defer file.Close()
+		log.Printf("[SRT] Writing raw MPEG-TS to file: %s", filePath)
+	}
+
 	s.manager.SetOutputActive(inputName, outputURL, true)
 
 	var totalBytes int64
@@ -709,18 +747,37 @@ func (s *SRTServer) handleFileOutput(inputName, outputURL string, dataCh <-chan 
 		select {
 		case <-stopCh:
 			log.Printf("[SRT] File output stopped: %s", filePath)
+			if isMp4 {
+				writeCloser.Close()
+				ffmpegCmd.Wait()
+			}
 			s.manager.SetOutputActive(inputName, outputURL, false)
 			return
 		case data, ok := <-dataCh:
 			if !ok {
+				if isMp4 {
+					writeCloser.Close()
+					ffmpegCmd.Wait()
+				}
 				s.manager.SetOutputActive(inputName, outputURL, false)
 				return
 			}
-			_, err := file.Write(data)
-			if err != nil {
-				log.Printf("[SRT] Write error to file %s: %v", filePath, err)
-				s.manager.SetOutputActive(inputName, outputURL, false)
-				return
+			if isMp4 {
+				_, err := writeCloser.Write(data)
+				if err != nil {
+					log.Printf("[SRT] Write error to ffmpeg pipe: %v", err)
+					writeCloser.Close()
+					ffmpegCmd.Wait()
+					s.manager.SetOutputActive(inputName, outputURL, false)
+					return
+				}
+			} else {
+				_, err := file.Write(data)
+				if err != nil {
+					log.Printf("[SRT] Write error to file %s: %v", filePath, err)
+					s.manager.SetOutputActive(inputName, outputURL, false)
+					return
+				}
 			}
 			totalBytes += int64(len(data))
 			s.manager.UpdateOutputBitrate(inputName, outputURL, totalBytes)

@@ -41,6 +41,7 @@ type WHIPSession struct {
 	ffmpegCmd           *exec.Cmd
 	outputMgr           *OutputManager
 	stopCh              chan struct{}
+	peerConnection      *webrtc.PeerConnection
 
 	// Pipe для отправки RTP пакетов в ffmpeg
 	audioWriter io.WriteCloser
@@ -181,10 +182,11 @@ func (w *WHIPServer) handleWHIP(wr http.ResponseWriter, r *http.Request) {
 
 	// Создаём сессию
 	session := &WHIPSession{
-		inputName: inputCfg.Name,
-		outputMgr: NewOutputManager(),
-		stopCh:    make(chan struct{}),
-		streamsCh: make(chan struct{}),
+		inputName:      inputCfg.Name,
+		outputMgr:      NewOutputManager(),
+		stopCh:         make(chan struct{}),
+		streamsCh:      make(chan struct{}),
+		peerConnection: peerConnection,
 	}
 
 	// Запускаем ffmpeg pipeline
@@ -479,21 +481,64 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 
 			if strings.HasPrefix(url, "file://") {
 				filename := strings.TrimPrefix(url, "file://")
-				file, err := os.Create(filename)
-				if err != nil {
-					log.Printf("[WHIP] Failed to create file %s: %v", filename, err)
-					time.Sleep(5 * time.Second)
-					continue // Повторная попытка
+				isMp4 := strings.HasSuffix(strings.ToLower(filename), ".mp4")
+
+				var ffmpegCmd *exec.Cmd
+				var writeCloser io.WriteCloser
+				var file *os.File
+				var muxer *flv.Muxer
+
+				if isMp4 {
+					ffmpegPath := "ffmpeg"
+					if _, err := os.Stat("./bin/ffmpeg.exe"); err == nil {
+						ffmpegPath = "./bin/ffmpeg.exe"
+					}
+					args := []string{
+						"-y",
+						"-f", "flv",
+						"-i", "pipe:0",
+						"-c", "copy",
+						"-movflags", "frag_keyframe+empty_moov",
+						filename,
+					}
+					ffmpegCmd = exec.Command(ffmpegPath, args...)
+					var err error
+					writeCloser, err = ffmpegCmd.StdinPipe()
+					if err != nil {
+						log.Printf("[WHIP] Failed to create ffmpeg stdin pipe for %s: %v", filename, err)
+						time.Sleep(5 * time.Second)
+						continue
+					}
+					if err := ffmpegCmd.Start(); err != nil {
+						log.Printf("[WHIP] Failed to start ffmpeg for %s: %v", filename, err)
+						time.Sleep(5 * time.Second)
+						continue
+					}
+					log.Printf("[WHIP] Writing fragmented MP4 via ffmpeg to: %s", filename)
+					muxer = flv.NewMuxer(writeCloser)
+				} else {
+					log.Printf("[WHIP] Creating file: %s", filename)
+					var err error
+					file, err = os.Create(filename)
+					if err != nil {
+						log.Printf("[WHIP] Failed to create file %s: %v", filename, err)
+						time.Sleep(5 * time.Second)
+						continue
+					}
+					log.Printf("[WHIP] Writing FLV directly to file: %s", filename)
+					muxer = flv.NewMuxer(file)
 				}
 
 				w.manager.SetOutputActive(inputName, url, true)
-				log.Printf("[WHIP] Writing FLV to file: %s", filename)
-
-				muxer := flv.NewMuxer(file)
-				err = muxer.WriteHeader(session.streams)
+				err := muxer.WriteHeader(session.streams)
 				if err != nil {
-					log.Printf("[WHIP] Failed to write FLV header to file %s: %v", filename, err)
-					file.Close()
+					log.Printf("[WHIP] Failed to write header: %v", err)
+					if isMp4 {
+						writeCloser.Close()
+						ffmpegCmd.Process.Kill()
+					} else {
+						file.Close()
+					}
 					w.manager.SetOutputActive(inputName, url, false)
 					time.Sleep(5 * time.Second)
 					continue
@@ -503,35 +548,55 @@ func (w *WHIPServer) createOutputPusher(session *WHIPSession, url string) func(<
 					select {
 					case <-stop:
 						if err := muxer.WriteTrailer(); err != nil {
-							log.Printf("[WHIP] Failed to write FLV trailer to file %s: %v", filename, err)
+							log.Printf("[WHIP] Failed to write trailer: %v", err)
 						}
-						file.Close()
+						if isMp4 {
+							writeCloser.Close()
+							ffmpegCmd.Wait()
+						} else {
+							file.Close()
+						}
 						w.manager.SetOutputActive(inputName, url, false)
 						log.Printf("[WHIP] File output stopped: %s", filename)
 						return
 					case <-session.stopCh:
 						if err := muxer.WriteTrailer(); err != nil {
-							log.Printf("[WHIP] Failed to write FLV trailer to file %s: %v", filename, err)
+							log.Printf("[WHIP] Failed to write trailer: %v", err)
 						}
-						file.Close()
+						if isMp4 {
+							writeCloser.Close()
+							ffmpegCmd.Wait()
+						} else {
+							file.Close()
+						}
 						w.manager.SetOutputActive(inputName, url, false)
 						return
 					case pkt, ok := <-ch:
 						if !ok {
 							if err := muxer.WriteTrailer(); err != nil {
-								log.Printf("[WHIP] Failed to write FLV trailer to file %s: %v", filename, err)
+								log.Printf("[WHIP] Failed to write trailer: %v", err)
 							}
-							file.Close()
+							if isMp4 {
+								writeCloser.Close()
+								ffmpegCmd.Wait()
+							} else {
+								file.Close()
+							}
 							w.manager.SetOutputActive(inputName, url, false)
 							return
 						}
-						err = muxer.WritePacket(pkt)
+						err := muxer.WritePacket(pkt)
 						if err != nil {
-							log.Printf("[WHIP] Write error to file %s: %v", filename, err)
+							log.Printf("[WHIP] Write error to output: %v", err)
 							if err := muxer.WriteTrailer(); err != nil {
-								log.Printf("[WHIP] Failed to write FLV trailer to file %s: %v", filename, err)
+								log.Printf("[WHIP] Failed to write trailer: %v", err)
 							}
-							file.Close()
+							if isMp4 {
+								writeCloser.Close()
+								ffmpegCmd.Wait()
+							} else {
+								file.Close()
+							}
 							w.manager.SetOutputActive(inputName, url, false)
 							time.Sleep(5 * time.Second)
 							break // Выход из внутреннего цикла для переподключения
@@ -825,6 +890,12 @@ func (w *WHIPServer) stopSession(session *WHIPSession) {
 	}
 
 	log.Printf("[WHIP] Stopping session for '%s'", session.inputName)
+
+	// Закрываем PeerConnection, чтобы прервать блокирующие ReadRTP вызовы
+	if session.peerConnection != nil {
+		session.peerConnection.Close()
+		log.Printf("[WHIP] PeerConnection closed for '%s'", session.inputName)
+	}
 
 	// Корректно закрываем writers чтобы FFmpeg получил EOF
 	if session.videoWriter != nil {
