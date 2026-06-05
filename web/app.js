@@ -117,18 +117,18 @@ const translations = {
         'help.outputs.formats': 'Примеры поддерживаемых форматов выходов:',
         'help.outputs.ex.rtmp': 'Ретрансляция на RTMP-сервер (YouTube, Twitch и др.)',
         'help.outputs.ex.srt': 'Ретрансляция по SRT',
-        'help.outputs.ex.flv': 'Запись в файл FLV (требует ffmpeg в PATH или bin/)',
+        'help.outputs.ex.flv': 'Запись в файл FLV (нативно, ffmpeg не нужен)',
         'help.outputs.ex.mp4': 'Запись в файл MP4 (требует ffmpeg в PATH или bin/)',
-        'help.outputs.mp4note': 'Для записи в файл необходим ffmpeg. Подробнее — в разделе «ffmpeg» ниже.',
+        'help.outputs.mp4note': 'Для записи MP4 необходим ffmpeg. FLV пишется нативно без внешних зависимостей. Подробнее — в разделе «ffmpeg» ниже.',
         'help.ffmpeg.title': 'ffmpeg для записи файлов',
-        'help.ffmpeg.body': 'Запись в FLV/MP4 использует ffmpeg как внешний процесс (stdin pipe). Бинарный файл ffmpeg должен находиться в папке <code>bin/</code> рядом с сервером или быть доступен в системном PATH.',
+        'help.ffmpeg.body': 'Запись в MP4 использует ffmpeg как внешний процесс (stdin pipe). Бинарный файл ffmpeg должен находиться в папке <code>bin/</code> рядом с сервером или быть доступен в системном PATH. FLV запись не требует ffmpeg.',,
         'help.ffmpeg.windows': 'Windows: скачайте готовую сборку с <b>gyan.dev</b> (раздел <i>release builds → essentials</i>). Разархивируйте, скопируйте <code>ffmpeg.exe</code> в папку <code>bin/</code>.',
         'help.ffmpeg.linux': 'Linux: установите через пакетный менеджер (<code>apt install ffmpeg</code>) или скачайте статический бинарник.',
         'help.ffmpeg.custom': 'Для работы WHIP требуется ffmpeg с поддержкой <code>libfdk_aac</code>. Стандартные сборки (gyan.dev essentials) этот кодек содержат.',
         'help.reconnect.title': 'Реконнект выходов',
         'help.reconnect.body': 'Если выход потерял соединение, он автоматически переподключается через интервал, заданный в Настройках. Принудительный реконнект доступен кнопкой на Дашборде (иконка «стрелки»). Это полезно, если приёмник перезапустился.',
         'help.config.title': 'Файл конфигурации',
-        'help.config.body': 'Настройки хранятся в файле <code>config.json</code> рядом с бинарным файлом сервера. Изменения через веб-интерфейс сохраняются в этот файл автоматически. Ручное редактирование также поддерживается — нажмите «Перезагрузить из файла» в разделе Настройки после правки вручную.'
+        'help.config.body': 'Настройки хранятся в файле <code>config.yaml</code> рядом с бинарным файлом сервера. Изменения через веб-интерфейс сохраняются в этот файл автоматически. Ручное редактирование также поддерживается — нажмите «Перезагрузить из файла» в разделе Настройки после правки вручную.'
     },
     en: {
         // Header
@@ -247,18 +247,18 @@ const translations = {
         'help.outputs.formats': 'Examples of supported output formats:',
         'help.outputs.ex.rtmp': 'Relay to RTMP server (YouTube, Twitch, etc.)',
         'help.outputs.ex.srt': 'Relay via SRT',
-        'help.outputs.ex.flv': 'Record to FLV file (requires ffmpeg in PATH or bin/)',
+        'help.outputs.ex.flv': 'Record to FLV file (native, no ffmpeg required)',
         'help.outputs.ex.mp4': 'Record to MP4 file (requires ffmpeg in PATH or bin/)',
-        'help.outputs.mp4note': 'File recording requires ffmpeg. See the «ffmpeg» section below.',
+        'help.outputs.mp4note': 'MP4 recording requires ffmpeg. FLV is written natively with no external dependencies. See the «ffmpeg» section below.',
         'help.ffmpeg.title': 'ffmpeg for File Recording',
-        'help.ffmpeg.body': 'Recording to FLV/MP4 uses ffmpeg as an external process (stdin pipe). The ffmpeg binary must be located in the <code>bin/</code> folder next to the server, or be available in the system PATH.',
+        'help.ffmpeg.body': 'MP4 recording uses ffmpeg as an external process (stdin pipe). The ffmpeg binary must be located in the <code>bin/</code> folder next to the server, or be available in the system PATH. FLV recording does not require ffmpeg.',,
         'help.ffmpeg.windows': 'Windows: download a pre-built binary from <b>gyan.dev</b> (section <i>release builds → essentials</i>). Extract and copy <code>ffmpeg.exe</code> into the <code>bin/</code> folder.',
         'help.ffmpeg.linux': 'Linux: install via package manager (<code>apt install ffmpeg</code>) or download a static binary.',
         'help.ffmpeg.custom': 'WHIP recording requires ffmpeg built with <code>libfdk_aac</code> support. Standard builds from gyan.dev (essentials) include this codec.',
         'help.reconnect.title': 'Output Reconnection',
         'help.reconnect.body': 'If an output loses its connection, it will automatically reconnect after the interval set in Settings. A manual reconnect is available via the button on the Dashboard (arrow icon). Useful when the receiving server restarts.',
         'help.config.title': 'Configuration File',
-        'help.config.body': 'Settings are stored in <code>config.json</code> next to the server binary. Changes made via the web interface are saved to this file automatically. Manual editing is also supported — click «Reload from file» in the Settings tab after editing manually.'
+        'help.config.body': 'Settings are stored in <code>config.yaml</code> next to the server binary. Changes made via the web interface are saved to this file automatically. Manual editing is also supported — click «Reload from file» in the Settings tab after editing manually.'
     }
 };
 
