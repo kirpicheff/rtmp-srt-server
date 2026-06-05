@@ -158,12 +158,12 @@ func (sm *StreamManager) SetStatusActive(name string, active bool) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	if s, ok := sm.status[name]; ok {
-		s.Active = active
 		if active {
 			s.Connections++
 		} else if s.Connections > 0 {
 			s.Connections--
 		}
+		s.Active = s.Connections > 0
 	}
 }
 
@@ -180,7 +180,7 @@ func (sm *StreamManager) GetStatus(name string) *StreamStatus {
 	defer sm.mu.RUnlock()
 	if s, ok := sm.status[name]; ok {
 		copy := *s
-		copy.Outputs = sm.GetOutputsStatus(name)
+		copy.Outputs = sm.getOutputsStatusLocked(name)
 		return &copy
 	}
 	return nil
@@ -202,7 +202,7 @@ func (sm *StreamManager) GetAllStatuses() []*StreamStatus {
 	for _, name := range names {
 		s := sm.status[name]
 		copy := *s
-		copy.Outputs = sm.GetOutputsStatus(s.Name)
+		copy.Outputs = sm.getOutputsStatusLocked(s.Name)
 		list = append(list, &copy)
 	}
 	return list
@@ -304,6 +304,10 @@ func (sm *StreamManager) UpdateOutputBitrate(inputName, url string, bytes int64)
 func (sm *StreamManager) GetOutputsStatus(inputName string) []*OutputStatus {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
+	return sm.getOutputsStatusLocked(inputName)
+}
+
+func (sm *StreamManager) getOutputsStatusLocked(inputName string) []*OutputStatus {
 	var list []*OutputStatus
 	if outMap, ok := sm.outputs[inputName]; ok {
 		// Получаем исходный порядок из конфигурации входа
@@ -439,8 +443,8 @@ func (sm *StreamManager) GetOrCreateStream(name, urlPath string) *Stream {
 
 	// Проверяем, существует ли уже поток
 	if status, exists := sm.status[name]; exists {
-		status.Active = true
 		status.Connections++
+		status.Active = status.Connections > 0
 		// Возвращаем существующий поток или создаем новый
 		return &Stream{
 			Name:    name,
@@ -452,8 +456,8 @@ func (sm *StreamManager) GetOrCreateStream(name, urlPath string) *Stream {
 	sm.status[name] = &StreamStatus{
 		Name:        name,
 		URLPath:     urlPath,
-		Active:      true,
 		Connections: 1,
+		Active:      true,
 	}
 
 	return &Stream{
@@ -467,10 +471,10 @@ func (sm *StreamManager) RemoveStream(name string) {
 	defer sm.mu.Unlock()
 
 	if status, exists := sm.status[name]; exists {
-		status.Active = false
 		if status.Connections > 0 {
 			status.Connections--
 		}
+		status.Active = status.Connections > 0
 	}
 }
 
