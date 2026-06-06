@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"embed"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -28,6 +30,12 @@ func NewAPIServer(sm *StreamManager, user, password string) *APIServer {
 
 func (api *APIServer) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Обход авторизации для локальных запросов (WebView GUI)
+		if strings.HasPrefix(r.RemoteAddr, "127.0.0.1:") || strings.HasPrefix(r.RemoteAddr, "[::1]:") || strings.HasPrefix(r.RemoteAddr, "localhost:") {
+			h(w, r)
+			return
+		}
+
 		if api.User == "" && api.Password == "" {
 			h(w, r)
 			return
@@ -321,7 +329,12 @@ func (api *APIServer) handleSettings(w http.ResponseWriter, r *http.Request) {
 			LogToFile         bool        `json:"log_to_file,omitempty"`
 			LogFile           string      `json:"log_file,omitempty"`
 			ReconnectInterval int         `json:"reconnect_interval,omitempty"`
+			MinimizeToTray    bool        `json:"minimize_to_tray,omitempty"`
 		}
+		bodyBytes, _ := io.ReadAll(r.Body)
+		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		log.Printf("[API] Raw PUT settings body: %s", string(bodyBytes))
+
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
 			return
@@ -344,7 +357,12 @@ func (api *APIServer) handleSettings(w http.ResponseWriter, r *http.Request) {
 		// Обновляем настройки
 		api.SM.mu.Lock()
 		if req.SRTSettings != (SRTSettings{}) {
-			api.SM.UpdateGlobalSettings(req.SRTSettings)
+			if api.SM.config == nil {
+				api.SM.config = &Config{}
+			}
+			api.SM.config.SRTSettings = req.SRTSettings
+			log.Printf("[API] Global SRT settings updated: latency=%d, passphrase=%s, streamid=%s",
+				req.SRTSettings.Latency, req.SRTSettings.Passphrase, req.SRTSettings.StreamID)
 		}
 		if req.LogToFile != api.SM.config.LogToFile {
 			api.SM.config.LogToFile = req.LogToFile
@@ -357,6 +375,10 @@ func (api *APIServer) handleSettings(w http.ResponseWriter, r *http.Request) {
 		if req.ReconnectInterval > 0 && req.ReconnectInterval != api.SM.config.ReconnectInterval {
 			api.SM.config.ReconnectInterval = req.ReconnectInterval
 			log.Printf("[API] ReconnectInterval updated: %d", req.ReconnectInterval)
+		}
+		if req.MinimizeToTray != api.SM.config.MinimizeToTray {
+			api.SM.config.MinimizeToTray = req.MinimizeToTray
+			log.Printf("[API] MinimizeToTray updated: %v", req.MinimizeToTray)
 		}
 		api.SM.mu.Unlock()
 
@@ -406,6 +428,7 @@ func (api *APIServer) saveSettingsToConfig(settings *Config) {
 	cfg.LogToFile = settings.LogToFile
 	cfg.LogFile = settings.LogFile
 	cfg.ReconnectInterval = settings.ReconnectInterval
+	cfg.MinimizeToTray = settings.MinimizeToTray
 
 	// Сохраняем обратно
 	out, err := yaml.Marshal(&cfg)
@@ -517,7 +540,9 @@ func (api *APIServer) handleWebInterface(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Basic auth для web-интерфейса
-	if api.User != "" || api.Password != "" {
+	// Обход авторизации для локальных запросов (WebView GUI)
+	isLocal := strings.HasPrefix(r.RemoteAddr, "127.0.0.1:") || strings.HasPrefix(r.RemoteAddr, "[::1]:") || strings.HasPrefix(r.RemoteAddr, "localhost:")
+	if !isLocal && (api.User != "" || api.Password != "") {
 		auth := r.Header.Get("Authorization")
 		if !strings.HasPrefix(auth, "Basic ") {
 			w.Header().Set("WWW-Authenticate", `Basic realm="WebUI"`)

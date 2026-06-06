@@ -177,9 +177,12 @@ func main() {
 		}
 	}()
 
-	// Ждём сигнал завершения
-	<-ctx.Done()
-	log.Println("Shutdown signal received")
+	// Вызываем startGUI. В зависимости от тэга сборки:
+	// - В !gui режиме: ждет сигналов завершения в консоли
+	// - В gui режиме: открывает WebView и при закрытии окна вызывает переданный stop()
+	startGUI("http://127.0.0.1:"+strconv.Itoa(cfg.Server.Port), cfg, stop)
+
+	log.Println("Shutdown initiated")
 
 	// Останавливаем heartbeat
 	heartbeatCancel()

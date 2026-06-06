@@ -36,6 +36,7 @@ type Config struct {
 	ReconnectInterval int          `yaml:"reconnect_interval"`
 	LogToFile         bool         `yaml:"log_to_file"`
 	LogFile           string       `yaml:"log_file"`
+	MinimizeToTray    bool         `yaml:"minimize_to_tray"`
 	Inputs            []InputCfg   `yaml:"inputs"`
 	APIAuthUser       string       `yaml:"api_auth_user" json:"-"`
 	APIAuthPassword   string       `yaml:"api_auth_password" json:"-"`
@@ -50,6 +51,37 @@ type InputCfg struct {
 }
 
 func LoadConfig(path string) (*Config, error) {
+	// Создаем дефолтный конфиг, если файла нет
+	if _, err := ioutil.ReadFile(path); err != nil {
+		defaultConfig := `server:
+  port: 8080
+  rtmp_port: 1935
+  srt_port: 9000
+  whip_port: 8084
+  api_username: admin
+  api_password: secret
+srt_port: 0
+reconnect_interval: 5
+log_to_file: true
+log_file: server.log
+minimize_to_tray: false
+inputs:
+  - name: obs
+    url_path: /live/stream
+    outputs: []
+api_auth_user: admin
+api_auth_password: secret
+srt_settings:
+  connect_timeout: 5000
+  latency: 200
+  encryption: none
+  passphrase: ""
+  streamid: ""`
+		if errWrite := ioutil.WriteFile(path, []byte(defaultConfig), 0644); errWrite != nil {
+			return nil, fmt.Errorf("failed to create default config: %w", errWrite)
+		}
+	}
+
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read config: %w", err)

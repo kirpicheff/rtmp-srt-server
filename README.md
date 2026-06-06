@@ -13,9 +13,13 @@ A server for relaying RTMP streams with SRT output support, WHIP (WebRTC-HTTP In
 - 📊 Status and statistics monitoring
 - ⚙️ SRT parameter configuration
 - 🔄 Automatic reconnection and manual force reconnect
+- 📥 Minimize to tray option (desktop GUI mode)
 
 ## Getting Started
 
+The application can run in either standard console (headless) mode or as a standalone desktop app with a WebView2 GUI (on Windows).
+
+### Console Mode (Default)
 1. Build the server:
 ```bash
 go build -o rtmpserver.exe .
@@ -25,11 +29,25 @@ go build -o rtmpserver.exe .
 ```bash
 ./rtmpserver.exe
 ```
+*(If `config.yaml` is missing in the executable's directory, a default one will be automatically generated upon launch).*
 
 3. Open the web interface in your browser:
 ```
 http://localhost:8080
 ```
+
+### Desktop GUI Mode (Windows)
+To build a single compact executable without a console window that starts directly with the GUI control panel:
+1. Make sure GCC (MinGW-w64) is installed in your system (e.g. via MSYS2).
+2. Run build script (which builds both console and GUI versions, restricting GUI compiling to x64):
+```cmd
+.\build.cmd
+```
+*Or compile manually:*
+```bash
+go build -tags gui -ldflags "-w -s -H=windowsgui" -o rtmpserver-gui.exe .
+```
+3. Run `rtmpserver-gui.exe`. It will open a native desktop window. Close the window to safely stop all streaming servers.
 
 ## Web Interface
 
@@ -57,7 +75,7 @@ http://localhost:8080
 
 #### ⚙️ Settings
 - Global SRT settings (latency, passphrase, streamid)
-- Logging settings
+- Logs & UI (logging configuration, optional minimize to tray)
 - Reconnect interval
 
 ## API Endpoints
@@ -134,7 +152,7 @@ http://localhost:8080
     ```bash
     curl -u admin:secret -X PUT http://localhost:8080/api/settings \
       -H 'Content-Type: application/json' \
-      -d '{"srt_settings":{"latency":200}}'
+      -d '{"srt_settings":{"latency":200},"log_to_file":true,"log_file":"server.log","reconnect_interval":5,"minimize_to_tray":true}'
     ```
 - `POST /api/settings/reload` - reload from file
   - **Example request:**
@@ -163,6 +181,7 @@ srt_settings:
 log_to_file: true
 log_file: "server.log"
 reconnect_interval: 5
+minimize_to_tray: false
 
 whip_settings:
   ice_servers:
@@ -410,9 +429,13 @@ v=0
 - 📊 Мониторинг статуса и статистики
 - ⚙️ Настройка параметров SRT
 - 🔄 Автоматическое переподключение и ручной force reconnect
+- 📥 Опция сворачивания в системный трей (в десктопном GUI режиме)
 
 ## Запуск
 
+Приложение может работать как в стандартном консольном (headless) режиме, так и в виде отдельного десктопного GUI-приложения для Windows (на базе WebView2).
+
+### Консольный режим (по умолчанию)
 1. Скомпилируйте сервер:
 ```bash
 go build -o rtmpserver.exe .
@@ -422,11 +445,25 @@ go build -o rtmpserver.exe .
 ```bash
 .\rtmpserver.exe
 ```
+*(Если в папке с исполняемым файлом отсутствует `config.yaml`, программа автоматически создаст его со стандартными параметрами при старте).*
 
 3. Откройте веб-интерфейс в браузере:
 ```
 http://localhost:8080
 ```
+
+### Десктопный GUI режим (Windows)
+Для сборки единого компактного исполняемого файла, запускающегося без окна консоли и сразу открывающего панель управления:
+1. Убедитесь, что в системе установлен компилятор GCC (например, через MSYS2).
+2. Запустите скрипт сборки (он соберет как консольные версии, так и GUI-версию под x64):
+```cmd
+.\build.cmd
+```
+*Или скомпилируйте вручную:*
+```bash
+go build -tags gui -ldflags "-w -s -H=windowsgui" -o rtmpserver-gui.exe .
+```
+3. Запустите `rtmpserver-gui.exe`. Закрытие графического окна безопасно остановит все стриминг-серверы и завершит процесс.
 
 ## Веб-интерфейс
 
@@ -454,8 +491,8 @@ http://localhost:8080
 
 #### ⚙️ Настройки
 - Глобальные настройки SRT (latency, passphrase, streamid)
-- Настройки логирования
-- Интервал переподключения
+- Логи и интерфейс (настройка файлов логов, опция сворачивания в трей)
+- Reconnect interval переподключения
 
 ## API Endpoints
 
@@ -531,7 +568,7 @@ http://localhost:8080
     ```bash
     curl -u admin:secret -X PUT http://localhost:8080/api/settings \
       -H 'Content-Type: application/json' \
-      -d '{"srt_settings":{"latency":200}}'
+      -d '{"srt_settings":{"latency":200},"log_to_file":true,"log_file":"server.log","reconnect_interval":5,"minimize_to_tray":true}'
     ```
 - `POST /api/settings/reload` - перезагрузить из файла
   - **Пример запроса:**
@@ -560,6 +597,7 @@ srt_settings:
 log_to_file: true
 log_file: "server.log"
 reconnect_interval: 5
+minimize_to_tray: false
 
 whip_settings:
   ice_servers:
@@ -753,7 +791,7 @@ go project/
   ```bash
   curl -u admin:secret -X PUT http://localhost:8080/api/settings \
     -H 'Content-Type: application/json' \
-    -d '{"srt_settings":{"latency":200}}'
+    -d '{"srt_settings":{"latency":200},"log_to_file":true,"log_file":"server.log","reconnect_interval":5,"minimize_to_tray":true}'
   ```
 - `POST /api/settings/reload` — reload from file
   ```bash
